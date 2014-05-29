@@ -1,0 +1,13 @@
+http:
+    port: 8080
+    adminPort: 8081
+
+mongodb:
+    default_database_uri: mongodb://127.0.0.1:27017/socialite
+
+services:
+    feed_service:
+        model: FanoutOnWriteToCache
+        cache_size_limit: 50
+        cache_users_posts: false 
+

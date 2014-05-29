@@ -1,0 +1,14 @@
+http:
+    port: 8080
+    adminPort: 8081
+
+mongodb:
+    default_database_uri: mongodb://127.0.0.1:27017/socialite
+
+services:
+    feed_service:
+        model: FanoutOnWriteTimeBuckets
+        bucket_timespan_days: 7
+        bucket_read_batch_size: 1
+        bucket_users_posts: false 
+

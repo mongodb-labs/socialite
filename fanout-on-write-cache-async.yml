@@ -1,0 +1,24 @@
+http:
+    port: 8080
+    adminPort: 8081
+
+mongodb:
+    default_database_uri: mongodb://127.0.0.1:27017/socialite
+
+services:
+    async_service:
+        model: DefaultAsyncService 
+        database_uri: mongodb://127.0.0.1:27017/socialite-async
+        recovery_poll_time: -1
+        processing_thread_pool_size: 0
+        async_tasks_max_queue_size: 0
+
+    feed_processing:
+        model: AsyncPostDelivery 
+        async_fanout_threshold: 0
+ 
+    feed_service:
+        model: FanoutOnWriteToCache
+        cache_size_limit: 50
+        cache_users_posts: false 
+
