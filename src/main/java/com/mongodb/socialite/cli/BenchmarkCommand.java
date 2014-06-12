@@ -7,8 +7,10 @@ import com.mongodb.socialite.ServiceManager;
 import com.mongodb.socialite.SocialiteConfiguration;
 import com.mongodb.socialite.benchmark.traffic.TrafficModel;
 import com.mongodb.socialite.resources.UserResource;
+import com.mongodb.socialite.configuration.FanoutOnWriteToCacheConfiguration;
 import com.yammer.dropwizard.cli.ConfiguredCommand;
 import com.yammer.dropwizard.config.Bootstrap;
+import com.yammer.dropwizard.config.Configuration;
 
 import net.sourceforge.argparse4j.inf.Namespace;
 import net.sourceforge.argparse4j.inf.Subparser;
@@ -22,7 +24,8 @@ import org.slf4j.LoggerFactory;
 
 public class BenchmarkCommand extends ConfiguredCommand<SocialiteConfiguration> {
 
-    private static Logger logger = LoggerFactory.getLogger(BenchmarkCommand.class);
+    private static final int DEFAULT_FEED_CACHE_SIZE = 50;
+	private static Logger logger = LoggerFactory.getLogger(BenchmarkCommand.class);
 
     public BenchmarkCommand() {
         super("benchmark", "Runs a synthetic workload benchmark");
@@ -118,6 +121,13 @@ public class BenchmarkCommand extends ConfiguredCommand<SocialiteConfiguration> 
 
         final UserResource userResource = new UserResource(services.getContentService(),
                 services.getFeedService(), services.getUserGraphService());
+        
+        // If using a cached feed service, determine the cache size for testing scroll off 
+        int cache_size = DEFAULT_FEED_CACHE_SIZE;
+        Configuration feedConfig = services.getFeedService().getConfiguration();
+        if(feedConfig instanceof FanoutOnWriteToCacheConfiguration){
+        	cache_size = ((FanoutOnWriteToCacheConfiguration)feedConfig).cache_size_limit;
+        }
 
         final TrafficModel model = new TrafficModel(
                 namespace.getInt("total_users"),
@@ -127,7 +137,8 @@ public class BenchmarkCommand extends ConfiguredCommand<SocialiteConfiguration> 
                 namespace.getFloat("read_timeline_pct"),
                 namespace.getFloat("scroll_timeline_pct"),
                 namespace.getFloat("send_content_pct"),
-                namespace.getInt("session_duration")
+                namespace.getInt("session_duration"),
+                cache_size
         );
 
         // Metrics setup

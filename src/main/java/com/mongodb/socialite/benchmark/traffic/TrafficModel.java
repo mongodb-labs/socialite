@@ -3,13 +3,11 @@ package com.mongodb.socialite.benchmark.traffic;
 import com.codahale.metrics.Timer;
 import com.mongodb.socialite.api.Content;
 import com.mongodb.socialite.resources.UserResource;
-import com.yammer.metrics.core.MetricsRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.ConcurrentMap;
 
 public class TrafficModel {
 
@@ -18,6 +16,7 @@ public class TrafficModel {
     private int session_duration;
     private ArrayList<VirtualUser> users;
     private int opCount;
+	private int cache_size;
     private Random rand = new Random();
 
     public enum Operation {
@@ -51,12 +50,13 @@ public class TrafficModel {
 
     public TrafficModel( int total_users, int active_users, float follow_pct, float unfollow_pct,
                          float read_timeline_pct, float scroll_timeline_pct, float send_content_pct,
-                         int session_duration ) {
+                         int session_duration, int cache_size ) {
         this.users = new ArrayList<VirtualUser>(active_users);
         this.operationChooser = new ArrayList<Operation>(100);
         this.total_users = total_users;
         this.active_users = active_users;
         this.session_duration = session_duration;
+        this.cache_size = cache_size;
 
         double sum = follow_pct +
                 unfollow_pct +
@@ -113,15 +113,15 @@ public class TrafficModel {
                 break;
             case READ_TIMELINE:
                 ctx = timers.get("read_timeline").time();
-                resource.getTimeline( user.id(), 50, null );
+                resource.getTimeline( user.id(), cache_size, null );
                 ctx.stop();
                 break;
             case SCROLL_TIMELINE:
-                List<Content> results = resource.getTimeline( user.id(), 50, null );
-                if(results.size() < 50) break; // not enough to scroll off cache
-                Content anchor = results.get(49);
+                List<Content> results = resource.getTimeline( user.id(), cache_size, null );
+                if(results.size() < cache_size) break; // not enough to scroll off cache
+                Content anchor = results.get(cache_size - 1);
                 ctx = timers.get("scroll_timeline").time();
-                resource.getTimeline( user.id(), 50, anchor.getContentId() );
+                resource.getTimeline( user.id(), cache_size, anchor.getContentId() );
                 ctx.stop();
                 break;
             case SEND_CONTENT:
