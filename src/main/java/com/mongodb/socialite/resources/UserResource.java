@@ -59,49 +59,49 @@ public class UserResource {
     @GET
     @Path("/{user_id}/follower_count")
     public FollowerCount getFollowerCount(@PathParam("user_id") String user_id ) {
-        User user = get(user_id);
-        return this.userGraph.getFollowerCount(user);
+        this.userGraph.validateUser(user_id);
+        return this.userGraph.getFollowerCount(new User(user_id));
     }
 
     @GET
     @Path("/{user_id}/followers")
     public List<User> getFollowers(@PathParam("user_id") String user_id,
             @DefaultValue("50") @QueryParam("limit") int limit) {
-        User user = get(user_id);
-        return this.userGraph.getFollowers(user, limit);
+        this.userGraph.validateUser(user_id);
+        return this.userGraph.getFollowers(new User(user_id), limit);
     }
 
     @GET
     @Path("/{user_id}/following")
     public List<User> getFriends(@PathParam("user_id") String user_id,
             @DefaultValue("50") @QueryParam("limit") int limit) {
-        User user = get(user_id);
-        return this.userGraph.getFollowing(user, limit);
+        this.userGraph.validateUser(user_id);
+        return this.userGraph.getFollowing(new User(user_id), limit);
     }
 
     @GET
     @Path("/{user_id}/following_count")
     public FollowingCount getFriendsCount(@PathParam("user_id") String user_id ) {
-        User user = get(user_id);
-        return this.userGraph.getFollowingCount(user);
+        this.userGraph.validateUser(user_id);
+        return this.userGraph.getFollowingCount(new User(user_id));
     }
 
     @PUT
     @Path("/{user_id}/following/{target}")
     public void follow(@PathParam("user_id") String user_id,
     		@PathParam("target") String to_follow ) {
-        User user = get(user_id);
-        User target = get(to_follow);
-        this.userGraph.follow( user, target );
+        this.userGraph.validateUser(user_id);
+        this.userGraph.validateUser(to_follow);
+        this.userGraph.follow( new User(user_id), new User(to_follow) );
     }
 
     @DELETE
     @Path("/{user_id}/following/{target}")
     public void unfollow(@PathParam("user_id") String user_id,
             @PathParam("target") String to_unfollow ) {
-        User user = get(user_id);
-        User target = get(to_unfollow);
-        this.userGraph.unfollow( user, target );
+        this.userGraph.validateUser(user_id);
+        this.userGraph.validateUser(to_unfollow);
+        this.userGraph.unfollow( new User(user_id), new User(to_unfollow) );
     }
 
     @POST
@@ -111,7 +111,8 @@ public class UserResource {
             @QueryParam("message") String message,
             @QueryParam("content") JSONParam data ) {
 
-        User author = get(user_id);
+        this.userGraph.validateUser(user_id);
+        User author = new User(user_id);
         Content newContent = new Content(author, message, data);
         
         // push to the content and feed services
@@ -125,8 +126,8 @@ public class UserResource {
     public List<Content> getPosts(@PathParam("user_id") String user_id,
             @DefaultValue("50") @QueryParam("limit") int limit,
             @QueryParam("anchor") ContentId anchor ) {
-        User user = get(user_id);
-        return this.feedService.getPostsBy(user, anchor, limit);
+        this.userGraph.validateUser(user_id);
+        return this.feedService.getPostsBy(new User(user_id), anchor, limit);
     }
 
     @GET
@@ -134,7 +135,7 @@ public class UserResource {
     public List<Content> getTimeline(@PathParam("user_id") String user_id,
             @DefaultValue("50") @QueryParam("limit") int limit,
             @QueryParam("anchor") ContentId anchor ) {
-        User user = get(user_id);
-        return this.feedService.getFeedFor(user, anchor, limit);
+        this.userGraph.validateUser(user_id);
+        return this.feedService.getFeedFor(new User(user_id), anchor, limit);
     }
 }

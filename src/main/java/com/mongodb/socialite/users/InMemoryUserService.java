@@ -8,10 +8,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import com.mongodb.DBObject;
 import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.api.FollowerCount;
 import com.mongodb.socialite.api.FollowingCount;
+import com.mongodb.socialite.api.ServiceException;
 import com.mongodb.socialite.api.User;
+import com.mongodb.socialite.api.UserGraphError;
 import com.mongodb.socialite.services.ServiceImplementation;
 import com.mongodb.socialite.services.TestService;
 import com.mongodb.socialite.services.UserGraphService;
@@ -55,6 +58,14 @@ public class InMemoryUserService implements UserGraphService, TestService {
         return users.get(userId);
     }
 
+	@Override
+	public void validateUser(String userId) throws ServiceException {
+		
+		if(this.users.containsKey(userId) == false)
+            throw new ServiceException(
+                    UserGraphError.UNKNOWN_USER).set("userId", userId);
+	}
+	
     @Override
     public void follow(User from, User to) {
         Set<User> following =  followingIndex.get(from.getUserId());

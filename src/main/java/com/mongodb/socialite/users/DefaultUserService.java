@@ -24,6 +24,9 @@ public class DefaultUserService
     private static final String EDGE_PEER_KEY = "_t";
     private static final String FOLLOWER_COUNT_KEY = "_cr";
     private static final String FOLLOWING_COUNT_KEY = "_cg";
+    
+    private static final BasicDBObject SELECT_USER_ID = 
+    		new BasicDBObject(USER_ID_KEY, 1);
 
     private final DBCollection users;
     private DBCollection followers = null;
@@ -105,6 +108,15 @@ public class DefaultUserService
                     UserGraphError.USER_ALREADY_EXISTS).set("userId", newUser.getUserId());
         }
     }
+
+    @Override
+	public void validateUser(String userId) throws ServiceException {
+        final DBObject result = this.users.findOne(byUserId(userId), SELECT_USER_ID);
+
+        if( result == null )
+            throw new ServiceException(
+                    UserGraphError.UNKNOWN_USER).set("userId", userId);
+	}
 
     @Override
     public List<User> getFollowers(final User user, final int limit) {
@@ -299,5 +311,4 @@ public class DefaultUserService
     static DBObject selectEdgeOwner() {
         return  new BasicDBObject(EDGE_OWNER_KEY, 1).append(USER_ID_KEY, 0);
     }
-
 }

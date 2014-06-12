@@ -10,6 +10,13 @@ import com.mongodb.socialite.api.User;
 public interface UserGraphService extends Service
 {
     /**
+     * Check a user ID refers to a valid user
+     * @param userId the target userId. If the user
+     * is invalid, a service exception is thrown.
+     */
+    public void validateUser(String userId) throws ServiceException;
+
+    /**
      * Create a user in the user graph
      * @param user a user object containing the proposed userid
      * and any additional user data to be stored with the user

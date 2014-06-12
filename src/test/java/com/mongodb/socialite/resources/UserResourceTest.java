@@ -44,6 +44,7 @@ public class UserResourceTest extends ResourceTest {
         when(users.getUserById(eq("user1"))).thenReturn(user1);
         when(users.getUserById(eq("user3"))).thenReturn(user3);
         when(users.getUserById(eq("user4"))).thenThrow(new ServiceException(UserGraphError.UNKNOWN_USER));
+        doThrow(new ServiceException(UserGraphError.UNKNOWN_USER)).when(users).validateUser("user4");
         doThrow(new ServiceException(UserGraphError.USER_ALREADY_EXISTS)).when(users).createUser(user1);
         when(users.getUserById(eq("user2"))).thenReturn(user2);
         List<User> user1followers = new ArrayList<User>();
