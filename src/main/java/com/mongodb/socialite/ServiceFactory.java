@@ -59,6 +59,11 @@ public class ServiceFactory {
         Map<String, Object> localConfig = new LinkedHashMap<String, Object>(serviceConfig);
         String serviceImpl = (String) localConfig.remove(ServiceManager.MODEL_KEY);
         
+        if(serviceImpl == null){
+            throw new ServiceException(FrameworkError.FAILED_TO_LOAD_SERVICE).
+            	set("serviceType", serviceType).set("missingField", ServiceManager.MODEL_KEY);	
+        }
+        
         T serviceInstance = null;
 
         try{
