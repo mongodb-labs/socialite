@@ -15,6 +15,8 @@ import com.yammer.dropwizard.config.Configuration;
 import java.util.List;
 import java.util.ArrayList;
 
+import org.bson.types.ObjectId;
+
 @ServiceImplementation(name = "DefaultUserService", configClass = DefaultUserServiceConfiguration.class)
 public class DefaultUserService 
     extends MongoBackedService implements UserGraphService {
@@ -189,14 +191,17 @@ public class DefaultUserService
     @Override
     public void follow(User user, User toFollow) {
 
+    	// Use the some edge _id for both edge collections
+    	ObjectId edgeId = new ObjectId();
+    	
         // create the "following" relationship
         if(config.maintain_following_collection){
-            insertEdge(this.following, user, toFollow);
+            insertEdgeWithId(this.following, edgeId, user, toFollow);
         }
 
         // create the reverse "follower" relationship
         if(config.maintain_follower_collection){
-            insertEdge(this.followers, toFollow, user);
+            insertEdgeWithId(this.followers, edgeId, toFollow, user);
         }
 
         // if maintaining, update the following and follower
@@ -256,16 +261,16 @@ public class DefaultUserService
         return this.config;
     }
 
-    private void insertEdge(DBCollection edgeCollection, User user, User toFollow) {
+    private void insertEdgeWithId(DBCollection edgeCollection, ObjectId id, User user, User toFollow) {
         try {
-            edgeCollection.insert( makeEdge(user, toFollow));
+            edgeCollection.insert( makeEdgeWithId(id, user, toFollow));
         } catch( MongoException.DuplicateKey e ) {
             // inserting duplicate edge is fine. keep going.
         }
     }
 
 
-    static List<User> getUsersFromCursor(DBCursor cursor, String fieldKey){
+	static List<User> getUsersFromCursor(DBCursor cursor, String fieldKey){
         try{
             // exhaust the cursor adding each user
             List<User> followers = new ArrayList<User>();
@@ -295,6 +300,11 @@ public class DefaultUserService
         return new BasicDBObject(EDGE_OWNER_KEY, 
                 from.getUserId()).append(EDGE_PEER_KEY, to.getUserId());
     }
+
+    static DBObject makeEdgeWithId(ObjectId id, User from, User to) {
+        return new BasicDBObject(USER_ID_KEY, id).append(EDGE_OWNER_KEY, 
+                from.getUserId()).append(EDGE_PEER_KEY, to.getUserId());
+	}
 
     static DBObject byEdgeOwner(String remote) {
         return new BasicDBObject(EDGE_OWNER_KEY, remote);
