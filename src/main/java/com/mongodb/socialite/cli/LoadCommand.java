@@ -18,15 +18,21 @@ import com.yammer.dropwizard.config.Bootstrap;
 import net.sourceforge.argparse4j.inf.Namespace;
 import net.sourceforge.argparse4j.inf.Subparser;
 
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.lang.Runnable;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class LoadCommand extends ConfiguredCommand<SocialiteConfiguration> {
 
-    public LoadCommand() {
+	private static Logger logger = LoggerFactory.getLogger(LoadCommand.class);
+
+	public LoadCommand() {
         super("load", "Loads synthetic data for testing");
     }
 
@@ -62,37 +68,57 @@ public class LoadCommand extends ConfiguredCommand<SocialiteConfiguration> {
         final int maxFollows = namespace.getInt("maxfollows");
         GraphGenerator graphGenerator = new ZipZipfGraphGenerator(maxFollows);
 
+        logger.info("Queuing user graph actions for {} users", userCount);
         for( int i = 0; i < userCount; i++ ) {
             final GraphMutation mutation = graphGenerator.next();
             executor.submit( new Runnable() {
                 @Override
                 public void run() {
-                    userGraph.createUser(mutation.user);
-                    for( User u : mutation.getFollowers() ) {
-                       userGraph.follow(mutation.user, u);
-                    }
+                	try{
+	                    userGraph.createUser(mutation.user);
+	                    List<User> followers = mutation.getFollowers();
+	                    for( User u : followers ) {
+	                       userGraph.follow(mutation.user, u);
+	                    }
+	                    
+	                    if(logger.isDebugEnabled()){
+	                    	logger.debug("Added {} followers for user {}", 
+	                    			followers.size(), mutation.user.getUserId());
+	                    }
+                	} catch(Exception e){
+                		logger.error(e.toString());
+                		logger.debug("", e);                		
+                	}
                 }
             });
         }
 
         int messageCount = namespace.getInt("messages");
+        logger.info("Queuing {} messages for {} users", messageCount, userCount);
         // send messageCount messages from each user
         for( int j = 0; j < messageCount; j++ ) {
             executor.submit( new Runnable() {
                 @Override
                 public void run() {
-                    for( int i = 0; i < userCount; i++ ) {
-                        final User user = new User( String.valueOf(i));
-                        final Content content = new Content( user, randomString(), null);
-                        contentService.publishContent(user, content);
-                        feedService.post( user, content );
-                    }
+                	try{
+	                    for( int i = 0; i < userCount; i++ ) {
+	                        final User user = new User( String.valueOf(i));
+	                        final Content content = new Content( user, randomString(), null);
+	                        contentService.publishContent(user, content);
+	                        feedService.post( user, content );
+	                    }
+                	} catch(Exception e){
+                		logger.error(e.toString());
+                		logger.debug("", e);                		
+                	}
                 }
             });
         }
 
         executor.shutdown();
-        executor.awaitTermination(10,TimeUnit.SECONDS);
+        logger.info("All actions queued, waiting for completion...");
+        executor.awaitTermination(Long.MAX_VALUE,TimeUnit.SECONDS);
+        logger.info("Done.");
         services.stop();
     }
 

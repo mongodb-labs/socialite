@@ -198,7 +198,8 @@ public class BenchmarkCommand extends ConfiguredCommand<SocialiteConfiguration> 
                         model.next(userResource, timers);                		
                 	}
                 	catch(Exception e){
-                		logger.error("Exception running workload", e);
+                		logger.error(e.toString());
+                		logger.debug("", e);
                 	}
                 }
             };
@@ -208,7 +209,7 @@ public class BenchmarkCommand extends ConfiguredCommand<SocialiteConfiguration> 
 
         Thread.sleep(namespace.getInt("duration") * 1000);
         reporter.stop();
-        System.out.println("Test done. Shutting down...");
+        logger.info("Test done. Shutting down...");
         for( ScheduledFuture<?> f : futures ) f.cancel(true);
         executor.shutdown();
         executor.awaitTermination(2, TimeUnit.SECONDS);
