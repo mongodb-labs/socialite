@@ -20,6 +20,6 @@ Socialite is a reference architecture that can be used to cover a wide range of 
   * [Content](docs/content.md) Service
   * [Async](docs/async.md) Service
 * Built in [benchmarking](docs/benchmarking.md)
-* [Configuration reference](docs/configuration.md) 
+* [Configuration reference](docs/config.md) 
 * [Planned](docs/planned.md) features
 
