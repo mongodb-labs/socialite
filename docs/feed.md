@@ -6,11 +6,11 @@ The feed service performs the following basic functions :
 * Forwards the content of the post to the Content Service
 * Serves timeline feeds for all users based on the posts of accounts they follow
 
-One major design decision for a feed service is how and when to assemble the timeline feed for users. Socialite abstracts this service via the [FeedService](https://github.com/darrenat10gen/socialite/blob/master/src/main/java/com/mongodb/socialite/services/FeedService.java) interface and provides a series pluggable reference implementations to demonstrate various models in action. The implementations each fall into the two broad categories.
+One major design decision for a feed service is how and when to assemble the timeline feed for users. Socialite abstracts this service via the [FeedService](../src/main/java/com/mongodb/socialite/services/FeedService.java) interface and provides a series pluggable reference implementations to demonstrate various models in action. The implementations each fall into the two broad categories.
 
 ### Fanout on Read
 
-The fanout on read approach is the simplest feed service implementation. Socialite implements this model in the [FanoutOnRead](https://github.com/darrenat10gen/socialite/blob/master/src/main/java/com/mongodb/socialite/feed/FanoutOnRead.java) service class.
+The fanout on read approach is the simplest feed service implementation. Socialite implements this model in the [FanoutOnRead](../src/main/java/com/mongodb/socialite/feed/FanoutOnRead.java) service class.
 
 ![alt text](fanout_on_read.png "Fanout On Read")
 
@@ -48,7 +48,7 @@ Socialite implements three variations of the model which differ by how the user 
 
 ### Fanout on Write - Timed Buckets
 
-This variant of fanout on write is implemented in Socialite by the [FanoutOnWriteTimeBuckets](https://github.com/darrenat10gen/socialite/blob/master/src/main/java/com/mongodb/socialite/feed/FanoutOnWriteTimeBuckets.java) service class. The model maintains a collection of “bucket” documents in the timed_buckets collection that are filled with posts for a user’s timeline for a given (configurable) time period.
+This variant of fanout on write is implemented in Socialite by the [FanoutOnWriteTimeBuckets](../src/main/java/com/mongodb/socialite/feed/FanoutOnWriteTimeBuckets.java) service class. The model maintains a collection of “bucket” documents in the timed_buckets collection that are filled with posts for a user’s timeline for a given (configurable) time period.
 
 For example, by default, all of the posts that belong in a users timeline for any given day will be stored in an array within the same document. Documents are automatically “upserted” for a user on any day for which a post exists. A sample of data organised this way would look like this :
 
@@ -84,7 +84,7 @@ Disadvantages of this model include :
 
 ### Fanout on Write - Sized Buckets
 
-This variant of fanout on write is implemented in Socialite by the [FanoutOnWriteSizedBuckets](https://github.com/darrenat10gen/socialite/blob/master/src/main/java/com/mongodb/socialite/feed/FanoutOnWriteSizedBuckets.java) service class. The model maintains a collection of “bucket” documents in the sized_buckets collection that are filled with a (configurable) set number of posts for a user’s timeline.
+This variant of fanout on write is implemented in Socialite by the [FanoutOnWriteSizedBuckets](../src/main/java/com/mongodb/socialite/feed/FanoutOnWriteSizedBuckets.java) service class. The model maintains a collection of “bucket” documents in the sized_buckets collection that are filled with a (configurable) set number of posts for a user’s timeline.
 
 While the documents for the timeline look quite similar to the timed buckets approach, there are a few important differences. The example below is the same data as seen in the timed_buckets section, however the messages for the user “jsr” are all in a single document. This is because the same document (per user) is used in this model to hold timeline messages until it has reached a pre-determined size at which point a new one will be created.
 
@@ -119,7 +119,7 @@ The two fanout on write models discussed so far essentially build and retain a p
 * Users that never read a timeline are having it persistently built anyway.
 * In many social networks, only very recent messages are accessed routinely
 
-Another approach is to store the persistent timeline of a user in a single cache document that is finite in size and only maintain this cache document for active users. Such an approach is implemented in Socialite by the [FanoutOnWriteToCache](https://github.com/darrenat10gen/socialite/blob/master/src/main/java/com/mongodb/socialite/feed/FanoutOnWriteToCache.java) service class.
+Another approach is to store the persistent timeline of a user in a single cache document that is finite in size and only maintain this cache document for active users. Such an approach is implemented in Socialite by the [FanoutOnWriteToCache](../src/main/java/com/mongodb/socialite/feed/FanoutOnWriteToCache.java) service class.
 
     $ db.timeline_cache.find().pretty()
     {
