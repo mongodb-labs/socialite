@@ -1,12 +1,12 @@
 ## User Graph Service
 
-This service manages the users of the system and more importantly the follower graph. The interface is defined and documented in Socialite by [UserGraphService.java](https://github.com/darrenat10gen/socialite/blob/master/src/main/java/com/mongodb/socialite/services/UserGraphService.java). The service must allow users to be added and removed from the system and allow users to “follow” the posts of others.
+This service manages the users of the system and more importantly the follower graph. The interface is defined and documented in Socialite by [UserGraphService.java](../src/main/java/com/mongodb/socialite/services/UserGraphService.java). The service must allow users to be added and removed from the system and allow users to “follow” the posts of others.
 
 The follower graph is also used for determining which user timelines receive the posts by any given author (the followers of that user). In many social networks, there can also be significant churn within the graph as users elect to follow and unfollow other users. For these reasons, this service must be carefully designed to scale to significant read and write loads.
 
 ### Schema Design
 
-The Socialite UserService implementation (see [DefaultUserService](https://github.com/darrenat10gen/socialite/blob/master/src/main/java/com/mongodb/socialite/users/DefaultUserService.java)) uses 3 MongoDB collections by default called users, followers, following.
+The Socialite UserService implementation (see [DefaultUserService](../src/main/java/com/mongodb/socialite/users/DefaultUserService.java)) uses 3 MongoDB collections by default called users, followers, following.
 
 The **users** collection keeps track of the typical user entity data (the userId and any other details provided during the call to createUser).
 
