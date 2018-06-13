@@ -1,24 +1,14 @@
 package com.mongodb.socialite.users;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
-import com.mongodb.DBObject;
 import com.mongodb.MongoClientURI;
-import com.mongodb.socialite.api.FollowerCount;
-import com.mongodb.socialite.api.FollowingCount;
-import com.mongodb.socialite.api.ServiceException;
-import com.mongodb.socialite.api.User;
-import com.mongodb.socialite.api.UserGraphError;
+import com.mongodb.socialite.api.*;
 import com.mongodb.socialite.services.ServiceImplementation;
 import com.mongodb.socialite.services.TestService;
 import com.mongodb.socialite.services.UserGraphService;
 import com.yammer.dropwizard.config.Configuration;
+
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @ServiceImplementation(name = "InMemoryUserService")
 public class InMemoryUserService implements UserGraphService, TestService {
@@ -103,7 +93,15 @@ public class InMemoryUserService implements UserGraphService, TestService {
     public List<User> getFollowing(User u, int limit) {
         return new ArrayList<User>(followingIndex.get(u.getUserId()));
     }
-    
+
+    @Override
+    public List<User> getFriendsOfFriendsAgg(User user) { return null; }
+
+    @Override
+    public List<User> getFriendsOfFriendsQuery(User user) {
+        return null;
+    }
+
     @Override
     public void reset(){
         users.clear();

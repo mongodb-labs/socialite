@@ -94,4 +94,24 @@ public interface UserGraphService extends Service
      * the user does not exist
      */
     public List<User> getFollowing(User user, int limit);
+
+    /**
+     * Retrieve a list of users who followers of a target user are
+     * following, using the aggregation framework
+     * @param user the target user
+     * @return a list of User objects representing the users
+     * that followers of the target user are following or an
+     * empty list if the user does not exist
+     */
+    public List<User> getFriendsOfFriendsAgg(User user);
+
+    /**
+     * Retrieve a list of users who followers of a target user are
+     * following, using only the query system
+     * @param user the target user
+     * @return a list of User objects representing the users
+     * that followers of the target user are following or an
+     * empty list if the user does not exist
+     */
+    public List<User> getFriendsOfFriendsQuery(User user);
 }

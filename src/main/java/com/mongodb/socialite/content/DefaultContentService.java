@@ -27,7 +27,7 @@ public class DefaultContentService
         super(dbUri, svcConfig);
         this.config = svcConfig;
         this.content = this.database.getCollection(config.content_collection_name);
-        this.content.ensureIndex( new BasicDBObject(
+        this.content.createIndex( new BasicDBObject(
                 Content.AUTHOR_KEY,1).append(Content.ID_KEY,1));
 
         this.contentValidator = new BasicContentValidator();

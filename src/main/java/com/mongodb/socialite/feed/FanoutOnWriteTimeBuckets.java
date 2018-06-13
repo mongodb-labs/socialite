@@ -53,7 +53,7 @@ public class FanoutOnWriteTimeBuckets extends CachedFeedService{
         
         // The id for this model is of form _id : { _t : 1234, _u : "userid" }
         // A separate index is created for {_id._t : -1 , _id._u : 1}
-        this.buckets.ensureIndex( new BasicDBObject(
+        this.buckets.createIndex( new BasicDBObject(
                 subField(BUCKET_ID_KEY, BUCKET_TIME_KEY), -1).
                 append(subField(BUCKET_ID_KEY, BUCKET_OWNER_KEY), 1));
     }

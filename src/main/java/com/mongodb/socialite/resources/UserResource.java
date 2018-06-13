@@ -86,6 +86,20 @@ public class UserResource {
         return this.userGraph.getFollowingCount(new User(user_id));
     }
 
+    @GET
+    @Path("/{user_id}/friends_of_friends_agg")
+    public List<User> getFriendsOfFriendsAgg(@PathParam("user_id") String user_id) {
+        this.userGraph.validateUser(user_id);
+        return this.userGraph.getFriendsOfFriendsAgg(new User(user_id));
+    }
+
+    @GET
+    @Path("/{user_id}/friends_of_friends_query")
+    public List<User> getFriendsOfFriendsQuery(@PathParam("user_id") String user_id) {
+        this.userGraph.validateUser(user_id);
+        return this.userGraph.getFriendsOfFriendsQuery(new User(user_id));
+    }
+
     @PUT
     @Path("/{user_id}/following/{target}")
     public void follow(@PathParam("user_id") String user_id,

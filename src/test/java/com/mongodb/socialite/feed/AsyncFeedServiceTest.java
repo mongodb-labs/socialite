@@ -20,8 +20,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Stopwatch;
-import com.mongodb.DB;
-import com.mongodb.DBCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.MongoCollection;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.ServiceManager;
@@ -54,7 +54,7 @@ public class AsyncFeedServiceTest {
     private static InMemoryContentService contentService;
     private ServiceManager services;
     private FeedService feedService;
-    private final DB asyncDatabase;
+    private final MongoDatabase asyncDatabase;
 
     private Content[] sendPosts(User user, int count){
         
@@ -76,7 +76,7 @@ public class AsyncFeedServiceTest {
         logger.info("Shutting down services...");
         services.stop();
         logger.info("Services shut down.");
-        asyncDatabase.getMongo().close();
+        // asyncDatabase.getMongo().close();
     }
 
     @Parameters
@@ -131,8 +131,8 @@ public class AsyncFeedServiceTest {
 
     public AsyncFeedServiceTest(String testName, Map<String, Object> svcConfig) 
                 throws UnknownHostException {
-        asyncDatabase = new MongoClient(new MongoClientURI(ASYNC_DATABASE_URI)).getDB(ASYNC_DATABASE_NAME);
-        asyncDatabase.dropDatabase();
+        asyncDatabase = new MongoClient(new MongoClientURI(ASYNC_DATABASE_URI)).getDatabase(ASYNC_DATABASE_NAME);
+        asyncDatabase.drop();
         String databaseName = DATABASE_NAME + "-" + testName;
         MongoClientURI uri = new MongoClientURI(BASE_URI + databaseName);
         DatabaseTools.dropDatabaseByURI(uri, databaseName);
@@ -207,7 +207,7 @@ public class AsyncFeedServiceTest {
         
         // Get the async recovery collection
         AsyncServiceConfiguration defaultConfig = new AsyncServiceConfiguration();
-        DBCollection asyncColl = asyncDatabase.getCollection(defaultConfig.recovery_collection_name);
+        MongoCollection asyncColl = asyncDatabase.getCollection(defaultConfig.recovery_collection_name);
         
         // Create a dummy user and post
         User dummyPoster = new User("DummyRemotePoster");
@@ -222,7 +222,7 @@ public class AsyncFeedServiceTest {
         // async database, async should process it
         AsyncPostTask task = new AsyncPostTask(null, dummyPoster, dummyContent);
         RecoveryRecord record = task.getRecoveryRecord();
-        asyncColl.insert(record.toDBObject());
+        asyncColl.insertOne(record.toDBObject());
         
         // Wait for it to be picked up and processed by async
         // The recovery poll time is set to 1000 in test
@@ -237,7 +237,7 @@ public class AsyncFeedServiceTest {
     public void shouldRecoverHungTask() throws Exception {
         // Get the async recovery collection
         AsyncServiceConfiguration defaultConfig = new AsyncServiceConfiguration();
-        DBCollection asyncColl = asyncDatabase.getCollection(defaultConfig.recovery_collection_name);
+        MongoCollection asyncColl = asyncDatabase.getCollection(defaultConfig.recovery_collection_name);
         
         // Create a dummy user and post
         User dummyPoster = new User("DummyFailedPoster");
@@ -257,7 +257,7 @@ public class AsyncFeedServiceTest {
         // fudge the processing timestamp
         Date timeoutDate = new Date((new Date()).getTime() - TIMEOUT_FAILURE_PERIOD);        
         record.toDBObject().put(RecoveryRecord.LAST_TIMESTAMP_KEY, timeoutDate);
-        asyncColl.insert(record.toDBObject());
+        asyncColl.insertOne(record.toDBObject());
         
         // Wait for it to be picked up and processed by async
         logger.info("Waiting for task to timeout...");

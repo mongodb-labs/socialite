@@ -48,7 +48,7 @@ public class DefaultAsyncService
 
         this.config = config;
         this.recoveryColl = this.database.getCollection(config.recovery_collection_name);
-        this.recoveryColl.ensureIndex(
+        this.recoveryColl.createIndex(
                 new BasicDBObject(RecoveryRecord.STATE_KEY, 1));
         
         // Get the identifier for this processor instance

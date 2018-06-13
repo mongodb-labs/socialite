@@ -7,4 +7,6 @@ target
 data
 .DS_Store
 output
+configs
+logs
 

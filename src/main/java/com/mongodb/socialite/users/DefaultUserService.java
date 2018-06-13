@@ -1,21 +1,19 @@
 package com.mongodb.socialite.users;
+
 import com.mongodb.*;
 import com.mongodb.socialite.MongoBackedService;
-import com.mongodb.socialite.api.FollowerCount;
-import com.mongodb.socialite.api.FollowingCount;
-import com.mongodb.socialite.api.FrameworkError;
-import com.mongodb.socialite.api.ServiceException;
-import com.mongodb.socialite.api.User;
-import com.mongodb.socialite.api.UserGraphError;
+import com.mongodb.socialite.api.*;
 import com.mongodb.socialite.configuration.DefaultUserServiceConfiguration;
 import com.mongodb.socialite.services.ServiceImplementation;
 import com.mongodb.socialite.services.UserGraphService;
 import com.yammer.dropwizard.config.Configuration;
-
-import java.util.List;
-import java.util.ArrayList;
-
+import org.bson.types.BasicBSONList;
 import org.bson.types.ObjectId;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 @ServiceImplementation(name = "DefaultUserService", configClass = DefaultUserServiceConfiguration.class)
 public class DefaultUserService 
@@ -50,12 +48,12 @@ public class DefaultUserService
 
             // forward indices are covered (for query performance)
             // and unique so that duplicates are detected and ignored
-            this.followers.ensureIndex(
+            this.followers.createIndex(
                     new BasicDBObject(EDGE_OWNER_KEY, 1).append(EDGE_PEER_KEY, 1),
-                    new BasicDBObject("unique", true ));
+                    new BasicDBObject("unique", true));
 
             if(config.maintain_reverse_index)
-                this.followers.ensureIndex(
+                this.followers.createIndex(
                         new BasicDBObject(EDGE_PEER_KEY, 1).append(EDGE_OWNER_KEY, 1));
         }
 
@@ -63,12 +61,12 @@ public class DefaultUserService
         if(config.maintain_following_collection){
             this.following = this.database.getCollection(config.following_collection_name);
 
-            this.following.ensureIndex(
+            this.following.createIndex(
                     new BasicDBObject(EDGE_OWNER_KEY, 1).append(EDGE_PEER_KEY, 1),
-                    new BasicDBObject("unique", true ));
+                    new BasicDBObject("unique", true));
 
             if(config.maintain_reverse_index)
-                this.following.ensureIndex(
+                this.following.createIndex(
                         new BasicDBObject(EDGE_PEER_KEY, 1).append(EDGE_OWNER_KEY, 1));
         }
 
@@ -105,7 +103,7 @@ public class DefaultUserService
         try {
             this.userValidator.validate(newUser);
             this.users.insert( newUser.toDBObject() );
-        } catch( MongoException.DuplicateKey e ) {
+        } catch( DuplicateKeyException e ) {
             throw new ServiceException(
                     UserGraphError.USER_ALREADY_EXISTS).set("userId", newUser.getUserId());
         }
@@ -189,6 +187,56 @@ public class DefaultUserService
     }
 
     @Override
+    public List<User> getFriendsOfFriendsAgg(final User user) {
+
+        // Get the user's friends.
+        BasicBSONList friend_ids = getFriendIdsUsingAgg(user);
+        if (friend_ids.size() == 0) {
+            // The user is not following anyone, will not have any friends of friends.
+            return new ArrayList<User>();
+        }
+
+        // Get their friends' _ids..
+        BasicBSONList fof_ids = getFriendsOfUsersAgg(user, friend_ids);
+        if (fof_ids.size() == 0) {
+            // None of the friends were following anyone, no friends of friends.
+            return new ArrayList<User>();
+        }
+
+        // Get the actual users.
+        List<User> fofs = new ArrayList<User>();
+        DBCursor cursor = this.users.find(new BasicDBObject(USER_ID_KEY, new BasicDBObject("$in", fof_ids)));
+        while (cursor.hasNext()) {
+            fofs.add(new User(cursor.next()));
+        }
+        return fofs;
+    }
+
+    @Override
+    public List<User> getFriendsOfFriendsQuery(final User user) {
+
+        // Get the _ids of all the user's friends.
+        List<String> friend_ids = getFriendIdsUsingQuery(user);
+        if (friend_ids.size() == 0)
+            // The user is not following anyone, will not have any friends of friends.
+            return new ArrayList<User>();
+
+        Set<String> fof_ids = getFriendsOfUsersQuery(user, friend_ids);
+        if (fof_ids.size() == 0) {
+            // None of the friends were following anyone, no friends of friends.
+            return new ArrayList<User>();
+        }
+
+        // Get the actual users.
+        QueryBuilder fof_users_query = new QueryBuilder();
+        fof_users_query = fof_users_query.put(USER_ID_KEY);
+        fof_users_query = fof_users_query.in(fof_ids.toArray());
+        DBCursor users_cursor = this.users.find(fof_users_query.get());
+        List<User> result = getUsersFromCursor(users_cursor, USER_ID_KEY);
+        return result;
+    }
+
+    @Override
     public void follow(User user, User toFollow) {
 
     	// Use the some edge _id for both edge collections
@@ -261,14 +309,187 @@ public class DefaultUserService
         return this.config;
     }
 
+    /**
+     * Use the aggregation framework to get a list of all the _ids of users who 'user' is following.
+     * @param user Any user.
+     * @return The _ids of all users who 'user' is following.
+     */
+    private BasicBSONList getFriendIdsUsingAgg(User user) {
+
+        DBCollection coll;  // Depending on the settings, we'll have to query different collections.
+        String user_id_key;  // This is the key that will have the friend's _id.
+        String friend_id_key;  // This is the key that will have the friend of friend's _id.
+
+        if(config.maintain_following_collection){
+            // If there is a following collection, get the users directly.
+            coll = this.following;
+            user_id_key = EDGE_OWNER_KEY;
+            friend_id_key = EDGE_PEER_KEY;
+        } else {
+            // Otherwise, get them from the follower collection.
+            coll = this.followers;
+            user_id_key = EDGE_PEER_KEY;
+            friend_id_key = EDGE_OWNER_KEY;
+        }
+
+        List<DBObject> friends_pipeline = new ArrayList<DBObject>(2);
+        // Pipeline to get the list of friends:
+        // [{$match: {user_id_key: user_id}},
+        //  {$group: {_id: null, followees: {$push: '$friend_id_key'}}]
+
+        // Get all the users the given user is following.
+        friends_pipeline.add(new BasicDBObject("$match",
+                new BasicDBObject(user_id_key, user.getUserId())));
+        // Add them all to a set.
+        friends_pipeline.add(new BasicDBObject("$group",
+                new BasicDBObject("_id", null)
+                        .append("followees",
+                                new BasicDBObject("$addToSet", "$" + friend_id_key))));
+
+        AggregationOutput output = coll.aggregate(friends_pipeline);
+        if (!output.results().iterator().hasNext()) {
+            return new BasicBSONList();
+        }
+
+        // There should only be one result, the list of friends.
+        DBObject friends = output.results().iterator().next();
+        BasicBSONList friends_list = (BasicBSONList) friends.get("followees");
+        assert(!output.results().iterator().hasNext());
+
+        return friends_list;
+    }
+
+    /**
+     * Use the aggregation framework to get the _ids of all users who have any of the users in 'friends_list' as a
+     * follower, excluding 'user'.
+     * @param user The original user.
+     * @param friend_ids The _ids of 'user's friends.
+     * @return The _ids of 'user's friends of friends.
+     */
+    private BasicBSONList getFriendsOfUsersAgg(User user, BasicBSONList friend_ids) {
+
+        DBCollection coll;  // Depending on the settings, we'll have to query different collections.
+        String friend_id_key;  // This is the key that will have the friend's _id.
+        String fof_id_key;  // This is the key that will have the friend of friend's _id.
+
+        if(config.maintain_following_collection){
+            // If there is a following collection, get the users directly.
+            coll = this.following;
+            friend_id_key = EDGE_OWNER_KEY;
+            fof_id_key = EDGE_PEER_KEY;
+        } else {
+            // Otherwise, get them from the follower collection.
+            coll = this.followers;
+            friend_id_key = EDGE_PEER_KEY;
+            fof_id_key = EDGE_OWNER_KEY;
+        }
+
+        List<DBObject> fof_pipeline = new ArrayList<DBObject>(2);
+        // Pipeline to get the friends of friends
+        // [{$match: {'$friend_id_key': {$in: <list of friends>}, '$fof_id_key': {$ne: <user's id>}}},
+        //  {$group: {_id: null, followees: {$addToSet: '$fof_id_key'}}]
+
+        // All users which any friend is following.
+        fof_pipeline.add(new BasicDBObject("$match",
+                new BasicDBObject(
+                        friend_id_key,
+                        new BasicDBObject("$in", friend_ids.toArray())
+                ).append(fof_id_key,
+                        new BasicDBObject("$ne", user.getUserId()))));
+
+        // Combine all _ids into a set.
+        fof_pipeline.add(new BasicDBObject("$group",
+                new BasicDBObject("_id", null)
+                        .append("fofs",
+                                new BasicDBObject("$addToSet", "$" + fof_id_key))));
+
+        AggregationOutput output = coll.aggregate(fof_pipeline);
+        if (!output.results().iterator().hasNext()) {
+            return new BasicBSONList();
+        }
+
+        // Should only be one result, the list of fofs.
+        BasicBSONList fof_ids = (BasicBSONList)output.results().iterator().next().get("fofs");
+        assert(!output.results().iterator().hasNext());
+        return fof_ids;
+    }
+
+    /**
+     * Use the query system to get the _ids of all users who have any of the users in 'friends_list' as a follower,
+     * excluding 'user'.
+     * @param user The original user.
+     * @param friend_ids The _ids of 'user's friends.
+     * @return The _ids of 'user's friends of friends.
+     */
+    private Set<String> getFriendsOfUsersQuery(User user, List<String> friend_ids) {
+        QueryBuilder fof_id_query;
+        DBObject proj;
+        DBCollection coll;
+        String fof_id_key;
+        if(config.maintain_following_collection){
+            coll = this.following;
+            proj = new BasicDBObject(USER_ID_KEY, false).append(EDGE_PEER_KEY, true);
+            fof_id_key = EDGE_PEER_KEY;
+            fof_id_query = QueryBuilder.start();
+            fof_id_query = fof_id_query.put(EDGE_OWNER_KEY);
+            fof_id_query = fof_id_query.in(friend_ids.toArray());
+        } else {
+            // otherwise get them from the follower collection
+            coll = this.followers;
+            proj = new BasicDBObject(USER_ID_KEY, false).append(EDGE_OWNER_KEY, true);
+            fof_id_key = EDGE_OWNER_KEY;
+            fof_id_query = QueryBuilder.start();
+            fof_id_query = fof_id_query.put(EDGE_PEER_KEY);
+            fof_id_query = fof_id_query.in(friend_ids.toArray());
+        }
+
+        DBCursor fof_ids_cursor = coll.find(fof_id_query.get(), proj);
+        // Make a set of all the results, since a user who has more than one follower in 'friend_ids' will appear in the
+        // query results multiple times.
+        Set<String> fof_ids = new HashSet<String>();
+        while (fof_ids_cursor.hasNext()) {
+            String user_id = (String)fof_ids_cursor.next().get(fof_id_key);
+            // A user should not be included in their set of friends of friends.
+            if (!user_id.equals(user.getUserId())) {
+                fof_ids.add(user_id);
+            }
+        }
+        return fof_ids;
+    }
+
+    /**
+     * Use the query system to get a list of the _ids of the users who 'user' is following.
+     * @param user Any user.
+     * @return The _ids of all users who 'user' is following.
+     */
+    private List<String> getFriendIdsUsingQuery(User user) {
+        DBCursor friends_cursor;
+        String friend_id_key;
+        if(config.maintain_following_collection){
+            // If there is a following collection, get the users directly
+            friends_cursor = this.following.find( byEdgeOwner(user.getUserId()), selectEdgePeer());
+            friend_id_key = EDGE_PEER_KEY;
+        } else {
+            // otherwise get them from the follower collection
+            friends_cursor = this.followers.find( byEdgePeer(user.getUserId()), selectEdgeOwner());
+            friend_id_key = EDGE_OWNER_KEY;
+        }
+
+        // Convert List<User> to List<String> of _ids to pass to $in query.
+        List<String> friend_ids = new ArrayList<String>();
+        while (friends_cursor.hasNext()) {
+            friend_ids.add((String)friends_cursor.next().get(friend_id_key));
+        }
+        return friend_ids;
+    }
+
     private void insertEdgeWithId(DBCollection edgeCollection, ObjectId id, User user, User toFollow) {
         try {
             edgeCollection.insert( makeEdgeWithId(id, user, toFollow));
-        } catch( MongoException.DuplicateKey e ) {
+        } catch( DuplicateKeyException e ) {
             // inserting duplicate edge is fine. keep going.
         }
     }
-
 
 	static List<User> getUsersFromCursor(DBCursor cursor, String fieldKey){
         try{

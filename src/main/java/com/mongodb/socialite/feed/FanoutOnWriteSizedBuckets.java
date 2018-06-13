@@ -44,7 +44,7 @@ public class FanoutOnWriteSizedBuckets extends CachedFeedService{
         
         // setup the buckets collection for users
         this.buckets = this.database.getCollection(config.bucket_collection_name);
-        this.buckets.ensureIndex( new BasicDBObject(
+        this.buckets.createIndex( new BasicDBObject(
                 BUCKET_OWNER_KEY, 1).append(BUCKET_ID_KEY, 1));
     }
     

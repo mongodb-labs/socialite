@@ -2,6 +2,8 @@ package com.mongodb.socialite.benchmark.traffic;
 
 import com.codahale.metrics.Timer;
 import com.mongodb.socialite.api.Content;
+import com.mongodb.socialite.api.FollowerCount;
+import com.mongodb.socialite.api.User;
 import com.mongodb.socialite.resources.UserResource;
 
 import java.util.ArrayList;
@@ -20,7 +22,7 @@ public class TrafficModel {
     private Random rand = new Random();
 
     public enum Operation {
-        FOLLOW, UNFOLLOW, READ_TIMELINE, SCROLL_TIMELINE, SEND_CONTENT
+        FOLLOW, UNFOLLOW, READ_TIMELINE, SCROLL_TIMELINE, SEND_CONTENT, FRIENDS_OF_FRIENDS_AGG, FRIENDS_OF_FRIENDS_QUERY
     }
 
     private ArrayList<Operation> operationChooser;
@@ -50,7 +52,7 @@ public class TrafficModel {
 
     public TrafficModel( int total_users, int active_users, float follow_pct, float unfollow_pct,
                          float read_timeline_pct, float scroll_timeline_pct, float send_content_pct,
-                         int session_duration, int cache_size ) {
+                         float fof_agg_pct, float fof_query_pct, int session_duration, int cache_size ) {
         this.users = new ArrayList<VirtualUser>(active_users);
         this.operationChooser = new ArrayList<Operation>(100);
         this.total_users = total_users;
@@ -62,13 +64,17 @@ public class TrafficModel {
                 unfollow_pct +
                 read_timeline_pct +
                 scroll_timeline_pct +
-                send_content_pct;
+                send_content_pct +
+                fof_agg_pct +
+                fof_query_pct;
 
         int follow_buckets = (int)(follow_pct / sum * 100);
         int unfollow_buckets = (int)(unfollow_pct / sum * 100);
         int read_timeline_buckets = (int)(read_timeline_pct / sum * 100);
         int scroll_timeline_buckets = (int)(scroll_timeline_pct / sum * 100);
         int send_content_buckets = (int)(send_content_pct / sum * 100);
+        int fof_agg_buckets = (int)(fof_agg_pct / sum * 100);
+        int fof_query_buckets = (int)(fof_query_pct / sum * 100);
 
         int i = 0;
         while(0 < follow_buckets--) { this.operationChooser.add(i++, Operation.FOLLOW); }
@@ -76,6 +82,8 @@ public class TrafficModel {
         while(0 < read_timeline_buckets--) { this.operationChooser.add(i++, Operation.READ_TIMELINE); }
         while(0 < scroll_timeline_buckets--) {this.operationChooser.add(i++, Operation.SCROLL_TIMELINE); }
         while(0 < send_content_buckets--) { this.operationChooser.add(i++, Operation.SEND_CONTENT); }
+        while(0 < fof_agg_buckets--) { this.operationChooser.add(i++, Operation.FRIENDS_OF_FRIENDS_AGG); }
+        while(0 < fof_query_buckets--) { this.operationChooser.add(i++, Operation.FRIENDS_OF_FRIENDS_QUERY); }
         this.opCount = this.operationChooser.size();
 
         for(int idx = 0; idx < active_users; idx++ ) {
@@ -103,13 +111,36 @@ public class TrafficModel {
         Timer.Context ctx = null;
         switch(op) {
             case FOLLOW:
-                String toFollow = Integer.toString(rand.nextInt(this.total_users));
+                String to_follow = Integer.toString(rand.nextInt(this.total_users));
                 ctx = timers.get("follow").time();
-                resource.follow( user.id(), toFollow );
+                resource.follow( user.id(), to_follow );
                 ctx.stop();
                 break;
             case UNFOLLOW:
-                // Erg. How can we do this if we don't know who they follow?
+                // Get the follower count (so we know how many to request to get all of them).
+                ctx = timers.get("get_follower_count").time();
+                FollowerCount fc = resource.getFollowerCount(user.id());
+                ctx.stop();
+                if (fc.getFollowerCount() < 1) {
+                    // No one to unfollow.
+                    break;
+                }
+
+                // Get all their friends.
+                ctx = timers.get("get_followers").time();
+                List<User> followers = resource.getFollowers(user.id(), fc.getFollowerCount());
+                ctx.stop();
+
+                if (followers.size() < 1) {
+                    // No one to unfollow.
+                    break;
+                }
+                // Actually unfollow them.
+                // String to_unfollow = Integer.toString(rand.nextInt(followers.size()));
+                User to_unfollow = followers.get(rand.nextInt(followers.size()));
+                ctx = timers.get("unfollow").time();
+                resource.unfollow(user.id(), to_unfollow.getUserId() );
+                ctx.stop();
                 break;
             case READ_TIMELINE:
                 ctx = timers.get("read_timeline").time();
@@ -129,11 +160,21 @@ public class TrafficModel {
                 resource.send( user.id(), randomMessage(), null );
                 ctx.stop();
                 break;
+            case FRIENDS_OF_FRIENDS_AGG:
+                ctx = timers.get("friends_of_friends_agg").time();
+                resource.getFriendsOfFriendsAgg(user.id());
+                ctx.stop();
+                break;
+            case FRIENDS_OF_FRIENDS_QUERY:
+                ctx = timers.get("friends_of_friends_query").time();
+                resource.getFriendsOfFriendsQuery(user.id());
+                ctx.stop();
+                break;
         }
     }
 
     protected Operation nextOperation() {
-        return this.operationChooser.get( rand.nextInt( this.opCount ) );
+           return this.operationChooser.get( rand.nextInt( this.opCount ) );
     }
 
     protected String getNextUserID() {

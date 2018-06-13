@@ -6,21 +6,22 @@ import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.ServiceManager;
 import com.mongodb.socialite.SocialiteConfiguration;
 import com.mongodb.socialite.benchmark.traffic.TrafficModel;
-import com.mongodb.socialite.resources.UserResource;
 import com.mongodb.socialite.configuration.FanoutOnWriteToCacheConfiguration;
+import com.mongodb.socialite.resources.UserResource;
 import com.yammer.dropwizard.cli.ConfiguredCommand;
 import com.yammer.dropwizard.config.Bootstrap;
 import com.yammer.dropwizard.config.Configuration;
-
 import net.sourceforge.argparse4j.inf.Namespace;
 import net.sourceforge.argparse4j.inf.Subparser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.*;
-import java.util.concurrent.*;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 public class BenchmarkCommand extends ConfiguredCommand<SocialiteConfiguration> {
 
@@ -76,25 +77,37 @@ public class BenchmarkCommand extends ConfiguredCommand<SocialiteConfiguration> 
                 .required(false)
                 .type(Float.class)
                 .setDefault(0f)
-                .help("Follow transaction percent");
+                .help("Unfollow transaction percent");
 
         subparser.addArgument("--read_timeline_pct")
                 .required(false)
                 .type(Float.class)
                 .setDefault(0f)
-                .help("Follow transaction percent");
+                .help("Read timeline transaction percent");
 
         subparser.addArgument("--scroll_timeline_pct")
                 .required(false)
                 .type(Float.class)
                 .setDefault(0f)
-                .help("Follow transaction percent");
+                .help("Scroll timeline transaction percent");
 
         subparser.addArgument("--send_content_pct")
                 .required(false)
                 .type(Float.class)
                 .setDefault(0f)
                 .help("Send content percent");
+
+        subparser.addArgument("--fof_agg_pct")
+                .required(false)
+                .type(Float.class)
+                .setDefault(0f)
+                .help("Percent of operations which gather the friends of friends using aggregation");
+
+        subparser.addArgument("--fof_query_pct")
+                .required(false)
+                .type(Float.class)
+                .setDefault(0f)
+                .help("Percent of operations which gather the friends of friends using queries");
 
         subparser.addArgument("--duration")
                 .required(false)
@@ -137,6 +150,8 @@ public class BenchmarkCommand extends ConfiguredCommand<SocialiteConfiguration> 
                 namespace.getFloat("read_timeline_pct"),
                 namespace.getFloat("scroll_timeline_pct"),
                 namespace.getFloat("send_content_pct"),
+                namespace.getFloat("fof_agg_pct"),
+                namespace.getFloat("fof_query_pct"),
                 namespace.getInt("session_duration"),
                 cache_size
         );
@@ -174,9 +189,13 @@ public class BenchmarkCommand extends ConfiguredCommand<SocialiteConfiguration> 
 
         timers.put("follow", metrics.timer("follow"));
         timers.put("unfollow", metrics.timer("unfollow"));
+        timers.put("get_follower_count", metrics.timer("get_follower_count"));
+        timers.put("get_followers", metrics.timer("get_followers"));
         timers.put("read_timeline", metrics.timer("read_timeline"));
         timers.put("scroll_timeline", metrics.timer("scroll_timeline"));
         timers.put("send_content", metrics.timer("send_content"));
+        timers.put("friends_of_friends_agg", metrics.timer("friends_of_friends_agg"));
+        timers.put("friends_of_friends_query", metrics.timer("friends_of_friends_query"));
 
         int concurrency = namespace.getInt("concurrency");
         ScheduledExecutorService executor = Executors.newScheduledThreadPool(concurrency);
@@ -199,6 +218,7 @@ public class BenchmarkCommand extends ConfiguredCommand<SocialiteConfiguration> 
                 	}
                 	catch(Exception e){
                 		logger.error(e.toString());
+                                e.printStackTrace();
                 		logger.debug("", e);
                 	}
                 }
