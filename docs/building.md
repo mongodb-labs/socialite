@@ -1,3 +1,7 @@
+## Building the repo
+
+     mvn install -DskipTests
+
 ## Running the service
 
 - Duplicate sample.yml and complete the configuration file
