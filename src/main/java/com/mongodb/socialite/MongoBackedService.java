@@ -4,6 +4,9 @@ import java.util.concurrent.TimeUnit;
 
 import com.mongodb.DB;
 import com.mongodb.MongoClient;
+import com.mongodb.client.ClientSession;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
 import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.api.DatabaseError;
 import com.mongodb.socialite.api.ServiceException;
@@ -14,6 +17,7 @@ public abstract class MongoBackedService implements Service {
 
     protected final MongoClient client;
     protected final DB database;
+    protected final MongoDatabase dbMC;
     
     public MongoBackedService(
             MongoClientURI defaultURI, 
@@ -35,6 +39,7 @@ public abstract class MongoBackedService implements Service {
         try {
             this.client = new MongoClient(uri);
             this.database = client.getDB(databaseName);
+            this.dbMC = client.getDatabase(databaseName);
         } catch (Exception e) {
             throw ServiceException.wrap(e, DatabaseError.CANNOT_CONNECT);
         }

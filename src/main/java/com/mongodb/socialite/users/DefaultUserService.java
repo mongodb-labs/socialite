@@ -1,6 +1,8 @@
 package com.mongodb.socialite.users;
 
 import com.mongodb.*;
+import com.mongodb.client.ClientSession;
+import com.mongodb.client.MongoCollection;
 import com.mongodb.socialite.MongoBackedService;
 import com.mongodb.socialite.api.*;
 import com.mongodb.socialite.configuration.DefaultUserServiceConfiguration;
@@ -9,14 +11,16 @@ import com.mongodb.socialite.services.UserGraphService;
 import com.yammer.dropwizard.config.Configuration;
 import org.bson.types.BasicBSONList;
 import org.bson.types.ObjectId;
+import org.bson.Document;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Date;
 
 @ServiceImplementation(name = "DefaultUserService", configClass = DefaultUserServiceConfiguration.class)
-public class DefaultUserService 
+public class DefaultUserService
     extends MongoBackedService implements UserGraphService {
 
     private static final String USER_ID_KEY = "_id";
@@ -24,20 +28,22 @@ public class DefaultUserService
     private static final String EDGE_PEER_KEY = "_t";
     private static final String FOLLOWER_COUNT_KEY = "_cr";
     private static final String FOLLOWING_COUNT_KEY = "_cg";
-    
-    private static final BasicDBObject SELECT_USER_ID = 
+
+    private static final BasicDBObject SELECT_USER_ID =
     		new BasicDBObject(USER_ID_KEY, 1);
 
     private final DBCollection users;
     private DBCollection followers = null;
     private DBCollection following = null;
+    private MongoCollection followersMC = null;
+    private MongoCollection followingMC = null;
 
     private final DefaultUserServiceConfiguration config;
     private final UserValidator userValidator;
 
     public DefaultUserService(final MongoClientURI dbUri, final DefaultUserServiceConfiguration svcConfig ) {
         super(dbUri, svcConfig);
-        
+
         this.config = svcConfig;  	
         this.users = this.database.getCollection(config.user_collection_name);
         this.userValidator = new BasicUserIdValidator();
@@ -45,12 +51,15 @@ public class DefaultUserService
         // establish the follower collection and create indices as configured
         if(config.maintain_follower_collection){
             this.followers = this.database.getCollection(config.follower_collection_name);
+            this.followersMC = this.dbMC.getCollection(config.follower_collection_name, BasicDBObject.class);
 
             // forward indices are covered (for query performance)
             // and unique so that duplicates are detected and ignored
+            System.out.print("Creating Index");
             this.followers.createIndex(
                     new BasicDBObject(EDGE_OWNER_KEY, 1).append(EDGE_PEER_KEY, 1),
                     new BasicDBObject("unique", true));
+            System.out.print(new Date());
 
             if(config.maintain_reverse_index)
                 this.followers.createIndex(
@@ -60,10 +69,13 @@ public class DefaultUserService
         // also establish following collection if configured
         if(config.maintain_following_collection){
             this.following = this.database.getCollection(config.following_collection_name);
+            this.followingMC = this.dbMC.getCollection(config.following_collection_name, BasicDBObject.class);
 
+            System.out.print("Creating Index");
             this.following.createIndex(
                     new BasicDBObject(EDGE_OWNER_KEY, 1).append(EDGE_PEER_KEY, 1),
                     new BasicDBObject("unique", true));
+            System.out.print(new Date());
 
             if(config.maintain_reverse_index)
                 this.following.createIndex(
@@ -137,7 +149,7 @@ public class DefaultUserService
             results = getUsersFromCursor(cursor, EDGE_OWNER_KEY);
         }
 
-        return results;    
+        return results;
     }
 
     @Override
@@ -171,7 +183,7 @@ public class DefaultUserService
             results = getUsersFromCursor(cursor, EDGE_OWNER_KEY);
         }
 
-        return results;    
+        return results;
     }
 
     @Override
@@ -242,6 +254,34 @@ public class DefaultUserService
     	// Use the some edge _id for both edge collections
     	ObjectId edgeId = new ObjectId();
     	
+        // if there are two collections, then we will be doing two inserts
+        // and we should wrap them in a transaction
+        if(config.transactions && config.maintain_following_collection && config.maintain_follower_collection) {
+            // establish session and start transaction
+            ClientSession clientSession = this.client.startSession();
+            clientSession.startTransaction();
+            try {
+               insertEdgeWithId(this.followingMC, edgeId, user, toFollow, clientSession);
+               insertEdgeWithId(this.followersMC, edgeId, toFollow, user, clientSession);
+               clientSession.commitTransaction();
+               return;
+            } catch (MongoCommandException e) {
+               System.err.println("Couldn't commit follow with " + e.getErrorCode());
+               if (e.hasErrorLabel(MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL)) {
+                    System.out.println("UnknownTransactionCommitResult...");
+               }
+               if (e.hasErrorLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL)) {
+                    System.out.println("TransientTransactionError, aborting transaction");
+               }
+               if (e.getErrorCode() == 251) {
+                    System.out.println("Transaction aborted due to duplicate edge");
+               } else {
+                   System.out.print(new Date());
+                   e.printStackTrace();
+               }
+            }
+        }
+
         // create the "following" relationship
         if(config.maintain_following_collection){
             insertEdgeWithId(this.following, edgeId, user, toFollow);
@@ -256,24 +296,47 @@ public class DefaultUserService
         // counts of the two users respectively
         if(config.store_follow_counts_with_user){
 
-            this.users.update(byUserId(user.getUserId()), 
+            this.users.update(byUserId(user.getUserId()),
                     increment(FOLLOWING_COUNT_KEY));
 
-            this.users.update(byUserId(toFollow.getUserId()), 
+            this.users.update(byUserId(toFollow.getUserId()),
                     increment(FOLLOWER_COUNT_KEY));    				
-        }    	
+        }
     }
 
 
     @Override
     public void unfollow(User user, User toRemove) {
 
-        // create the "following" relationship
+        // if there are two collections, then we will be doing two removes
+        // and we should wrap them in a transaction
+        if(config.transactions && config.maintain_following_collection && config.maintain_follower_collection) {
+            // establish session and start transaction
+            ClientSession clientSession = this.client.startSession();
+            clientSession.startTransaction();
+            try {
+               this.followingMC.deleteOne(clientSession, new Document(makeEdge(user, toRemove).toMap()));
+               this.followersMC.deleteOne(clientSession, new Document(makeEdge(toRemove, user).toMap()));
+               clientSession.commitTransaction();
+               return;
+            } catch (MongoCommandException e) {
+               System.err.println("Couldn't commit unfollow with " + e.getErrorCode());
+               if (e.hasErrorLabel(MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL)) {
+                    System.out.println("UnknownTransactionCommitResult...");
+               }
+               if (e.hasErrorLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL)) {
+                    System.out.println("TransientTransactionError, aborting transaction");
+               }
+               e.printStackTrace();
+            }
+        }
+
+        // remove the "following" relationship
         if(config.maintain_following_collection){
             this.following.remove(makeEdge(user, toRemove));
         }
 
-        // create the reverse "follower" relationship
+        // remove the reverse "follower" relationship
         if(config.maintain_follower_collection){
             this.followers.remove(makeEdge(toRemove, user));
         }
@@ -282,10 +345,10 @@ public class DefaultUserService
         // counts of the two users respectively
         if(config.store_follow_counts_with_user){
 
-            this.users.update(byUserId(user.getUserId()), 
+            this.users.update(byUserId(user.getUserId()),
                     decrement(FOLLOWING_COUNT_KEY));
 
-            this.users.update(byUserId(toRemove.getUserId()), 
+            this.users.update(byUserId(toRemove.getUserId()),
                     decrement(FOLLOWER_COUNT_KEY));    				
         }    	
     }
@@ -303,7 +366,7 @@ public class DefaultUserService
         this.users.remove( byUserId(userId) );
 
     }
-    
+
     @Override
     public Configuration getConfiguration() {
         return this.config;
@@ -491,6 +554,19 @@ public class DefaultUserService
         }
     }
 
+    private void insertEdgeWithId(MongoCollection edgeCollection, ObjectId id, User user, User toFollow, ClientSession session) {
+        try {
+            edgeCollection.insertOne( session, makeEdgeWithId(id, user, toFollow));
+        } catch( MongoCommandException e ) {
+            if (e.getErrorCode() != 11000) {
+                throw e; // System.err.println(e.getErrorMessage());
+            } else {
+            // inserting duplicate edge is fine. keep going.
+                System.out.println("Duplicate key when inserting follow");
+            }
+        }
+    }
+
 	static List<User> getUsersFromCursor(DBCursor cursor, String fieldKey){
         try{
             // exhaust the cursor adding each user
@@ -518,12 +594,12 @@ public class DefaultUserService
     }
 
     static DBObject makeEdge(final User from, final User to) {
-        return new BasicDBObject(EDGE_OWNER_KEY, 
+        return new BasicDBObject(EDGE_OWNER_KEY,
                 from.getUserId()).append(EDGE_PEER_KEY, to.getUserId());
     }
 
     static DBObject makeEdgeWithId(ObjectId id, User from, User to) {
-        return new BasicDBObject(USER_ID_KEY, id).append(EDGE_OWNER_KEY, 
+        return new BasicDBObject(USER_ID_KEY, id).append(EDGE_OWNER_KEY,
                 from.getUserId()).append(EDGE_PEER_KEY, to.getUserId());
 	}
 
