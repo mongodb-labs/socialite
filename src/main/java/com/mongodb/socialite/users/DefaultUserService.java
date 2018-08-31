@@ -253,31 +253,36 @@ public class DefaultUserService
 
     	// Use the some edge _id for both edge collections
     	ObjectId edgeId = new ObjectId();
-    	
+    	ClientSession clientSession = null;
         // if there are two collections, then we will be doing two inserts
         // and we should wrap them in a transaction
         if(config.transactions && config.maintain_following_collection && config.maintain_follower_collection) {
             // establish session and start transaction
-            ClientSession clientSession = this.client.startSession();
-            clientSession.startTransaction();
-            try {
-               insertEdgeWithId(this.followingMC, edgeId, user, toFollow, clientSession);
-               insertEdgeWithId(this.followersMC, edgeId, toFollow, user, clientSession);
-               clientSession.commitTransaction();
-               return;
-            } catch (MongoCommandException e) {
-               System.err.println("Couldn't commit follow with " + e.getErrorCode());
-               if (e.hasErrorLabel(MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL)) {
-                    System.out.println("UnknownTransactionCommitResult...");
-               }
-               if (e.hasErrorLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL)) {
-                    System.out.println("TransientTransactionError, aborting transaction");
-               }
-               if (e.getErrorCode() == 251) {
-                    System.out.println("Transaction aborted due to duplicate edge");
-               } else {
-                   System.out.print(new Date());
-                   e.printStackTrace();
+            while (true) {
+               try {
+                  clientSession = this.client.startSession();
+                  clientSession.startTransaction();
+                  insertEdgeWithId(this.followingMC, edgeId, user, toFollow, clientSession);
+                  insertEdgeWithId(this.followersMC, edgeId, toFollow, user, clientSession);
+                  clientSession.commitTransaction();
+                  return;
+               } catch (MongoCommandException e) {
+                  System.err.println("Couldn't commit follow with " + e.getErrorCode());
+                  if (e.getErrorCode() == 24) {
+                      System.out.println("Lock Timeout...  retrying transaction");
+                  } else if (e.getErrorCode() == 251) {
+                       System.out.println("Transaction aborted due to duplicate edge, not retrying");
+                       return;
+                  } else if (e.hasErrorLabel(MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL)) {
+                       System.out.println("UnknownTransactionCommitResult... retrying transaction");
+                  } else if (e.hasErrorLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL)) {
+                       System.out.println("TransientTransactionError, retrying transaction");
+                  } else {
+                       System.out.println("Some other error, retrying");
+                       e.printStackTrace();
+                  }
+               } finally {
+                  clientSession.close();
                }
             }
         }
@@ -308,26 +313,34 @@ public class DefaultUserService
     @Override
     public void unfollow(User user, User toRemove) {
 
+         ClientSession clientSession = null;
         // if there are two collections, then we will be doing two removes
         // and we should wrap them in a transaction
         if(config.transactions && config.maintain_following_collection && config.maintain_follower_collection) {
             // establish session and start transaction
-            ClientSession clientSession = this.client.startSession();
-            clientSession.startTransaction();
-            try {
-               this.followingMC.deleteOne(clientSession, new Document(makeEdge(user, toRemove).toMap()));
-               this.followersMC.deleteOne(clientSession, new Document(makeEdge(toRemove, user).toMap()));
-               clientSession.commitTransaction();
-               return;
-            } catch (MongoCommandException e) {
-               System.err.println("Couldn't commit unfollow with " + e.getErrorCode());
-               if (e.hasErrorLabel(MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL)) {
-                    System.out.println("UnknownTransactionCommitResult...");
+            while (true) {
+               try {
+                  clientSession = this.client.startSession();
+                  clientSession.startTransaction();
+                  this.followingMC.deleteOne(clientSession, new Document(makeEdge(user, toRemove).toMap()));
+                  this.followersMC.deleteOne(clientSession, new Document(makeEdge(toRemove, user).toMap()));
+                  clientSession.commitTransaction();
+                  return;
+               } catch (MongoCommandException e) {
+                  System.err.println("Couldn't commit unfollow with " + e.getErrorCode());
+                  if (e.getErrorCode() == 24) {
+                      System.out.println("Lock Timeout...  retrying transaction");
+                  } else if (e.hasErrorLabel(MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL)) {
+                       System.out.println("UnknownTransactionCommitResult... retrying transaction");
+                  } else if (e.hasErrorLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL)) {
+                       System.out.println("TransientTransactionError, retrying transaction");
+                  } else {
+                       System.out.println("Some other error with unfollow, retrying");
+                       e.printStackTrace();
+                  }
+               } finally {
+                  clientSession.close();
                }
-               if (e.hasErrorLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL)) {
-                    System.out.println("TransientTransactionError, aborting transaction");
-               }
-               e.printStackTrace();
             }
         }
 
