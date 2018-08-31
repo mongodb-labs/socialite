@@ -47,6 +47,11 @@ public class DefaultUserServiceConfiguration extends MongoServiceConfiguration {
 	public String user_collection_name = "users";
 	
 	/**
+	 * Modify user graph transactionally
+	 */
+	public boolean transactions = false;
+
+	/**
 	 * Validation provider for new users
 	 */
 	public String user_validation_class = "com.mongodb.socialite.users.";
