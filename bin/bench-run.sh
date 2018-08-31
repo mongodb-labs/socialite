@@ -23,7 +23,7 @@ fi
 # 3. Process the output files and generate a plot for each benchmark
 #    There will be 1 series in each benchmark for each of the scnearios passed in
 
-benchmark="run"
+benchmark="benchmark"
 
 #  --totalusers TOTALUSERS --concurrentusers CONCURRENTUSERS --threads THREADS --seconds SECONDS [file]
 
