@@ -13,6 +13,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
+import com.mongodb.DuplicateKeyException;
 import com.mongodb.socialite.api.Content;
 import com.mongodb.socialite.api.ContentId;
 import com.mongodb.socialite.api.User;
@@ -128,8 +129,10 @@ public class ContentCache {
             this.postCache = this.contentService.getContentFor(user, null, config.cache_size_limit);
             Collections.reverse(this.postCache);
         }
-        
-        this.cacheCollection.save(getCacheDocument());
+        try {
+            this.cacheCollection.save(getCacheDocument());
+        } catch( DuplicateKeyException e ) {
+        }
     }
 
     private void pushContentToCache(final Content content, final String fieldKey){
