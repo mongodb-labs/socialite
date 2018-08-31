@@ -254,6 +254,8 @@ public class DefaultUserService
     	// Use the some edge _id for both edge collections
     	ObjectId edgeId = new ObjectId();
     	ClientSession clientSession = null;
+        int txn_retries = 0;
+
         // if there are two collections, then we will be doing two inserts
         // and we should wrap them in a transaction
         if(config.transactions && config.maintain_following_collection && config.maintain_follower_collection) {
@@ -265,11 +267,15 @@ public class DefaultUserService
                   insertEdgeWithId(this.followingMC, edgeId, user, toFollow, clientSession);
                   insertEdgeWithId(this.followersMC, edgeId, toFollow, user, clientSession);
                   clientSession.commitTransaction();
+                  if (txn_retries > 0)  System.out.println("Committed after " + txn_retries + " retries.");
                   return;
                } catch (MongoCommandException e) {
                   System.err.println("Couldn't commit follow with " + e.getErrorCode());
                   if (e.getErrorCode() == 24) {
                       System.out.println("Lock Timeout...  retrying transaction");
+                  } else if (e.getErrorCode() == 11000) {
+                       System.out.println("This is a duplicate edge, not retrying");
+                       return;
                   } else if (e.getErrorCode() == 251) {
                        System.out.println("Transaction aborted due to duplicate edge, not retrying");
                        return;
@@ -283,6 +289,7 @@ public class DefaultUserService
                   }
                } finally {
                   clientSession.close();
+                  txn_retries++;   // maybe sleep a bit?
                }
             }
         }
@@ -313,7 +320,8 @@ public class DefaultUserService
     @Override
     public void unfollow(User user, User toRemove) {
 
-         ClientSession clientSession = null;
+        ClientSession clientSession = null;
+        int txn_retries = 0;
         // if there are two collections, then we will be doing two removes
         // and we should wrap them in a transaction
         if(config.transactions && config.maintain_following_collection && config.maintain_follower_collection) {
@@ -325,6 +333,7 @@ public class DefaultUserService
                   this.followingMC.deleteOne(clientSession, new Document(makeEdge(user, toRemove).toMap()));
                   this.followersMC.deleteOne(clientSession, new Document(makeEdge(toRemove, user).toMap()));
                   clientSession.commitTransaction();
+                  if (txn_retries > 0)  System.out.println("Committed after " + txn_retries + " retries.");
                   return;
                } catch (MongoCommandException e) {
                   System.err.println("Couldn't commit unfollow with " + e.getErrorCode());
@@ -340,6 +349,7 @@ public class DefaultUserService
                   }
                } finally {
                   clientSession.close();
+                  txn_retries++;   // maybe sleep a bit?
                }
             }
         }
@@ -568,16 +578,16 @@ public class DefaultUserService
     }
 
     private void insertEdgeWithId(MongoCollection edgeCollection, ObjectId id, User user, User toFollow, ClientSession session) {
-        try {
+        // try {
             edgeCollection.insertOne( session, makeEdgeWithId(id, user, toFollow));
-        } catch( MongoCommandException e ) {
-            if (e.getErrorCode() != 11000) {
-                throw e; // System.err.println(e.getErrorMessage());
-            } else {
+        // } catch( MongoCommandException e ) {
+        //    if (e.getErrorCode() != 11000) {
+        //        throw e; // System.err.println(e.getErrorMessage());
+        //    } else {
             // inserting duplicate edge is fine. keep going.
-                System.out.println("Duplicate key when inserting follow");
-            }
-        }
+        //        System.out.println("Duplicate key when inserting follow");
+        //    }
+       // }
     }
 
 	static List<User> getUsersFromCursor(DBCursor cursor, String fieldKey){
