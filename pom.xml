@@ -49,11 +49,19 @@
                 <version>2.17</version>
                 <configuration>
                     <systemProperties>
-                        <property> 
+                        <property>
                             <name>java.util.logging.config.file</name>
                             <value>src/test/resources/test-logging.properties</value>
                         </property>
                     </systemProperties>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
                 </configuration>
             </plugin>
             <plugin>
