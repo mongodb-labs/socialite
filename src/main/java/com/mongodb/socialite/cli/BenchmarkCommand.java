@@ -210,17 +210,24 @@ public class BenchmarkCommand extends ConfiguredCommand<SocialiteConfiguration> 
 
         reporter.start(1,TimeUnit.SECONDS);
         final List<ScheduledFuture<?>> futures = new ArrayList<ScheduledFuture<?>>(namespace.getInt("concurrency"));
-        for( int i = 0; i < concurrency; i++ ){
+        for( int i = 0; i < concurrency; i++ ) {
             final Runnable worker = new Runnable() {
                 public void run() {
-                	try{
-                        model.next(userResource, timers);                		
-                	}
-                	catch(Exception e){
-                		logger.error(e.toString());
-                                e.printStackTrace();
-                		logger.debug("", e);
-                	}
+                    try {
+                        model.next(userResource, timers);
+                    }
+                    catch(com.mongodb.MongoInterruptedException mie) {
+                        if(logger.isDebugEnabled()) {
+                            logger.debug("", mie);
+                        }
+                    }
+                    catch(Exception e) {
+                        logger.error(e.toString());
+                        e.printStackTrace();
+                        if(logger.isDebugEnabled()) {
+                            logger.debug("", e);
+                        }
+                    }
                 }
             };
 
