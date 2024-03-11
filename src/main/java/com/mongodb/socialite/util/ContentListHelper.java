@@ -10,6 +10,8 @@ import org.bson.types.ObjectId;
 import com.mongodb.socialite.api.Content;
 import com.mongodb.socialite.api.ContentId;
 
+import org.bson.Document;
+
 public class ContentListHelper {
 
     private static Comparator<Content> backwardTimeComparator = new Comparator<Content>() {
@@ -31,24 +33,24 @@ public class ContentListHelper {
         }};
 
     public static List<Content> extractContent(
-            final List<Content> source, final ContentId anchor, 
+            final List<Content> source, final ContentId anchor,
             final int limit, final boolean allowFutureAnchor){
         int count = Math.abs(limit);
-        final boolean forward = limit > 0;       
+        final boolean forward = limit > 0;
         List<Content> results = new ArrayList<Content>(count);
-        
-        if(anchor != null){                
+
+        if(anchor != null){
             // find the anchor object, then walk backward or forward in time
-            Content markerObject = new Content(anchor.toDBObject());
+            Content markerObject = new Content(new Document("_id", anchor.getId()));
             int index = Collections.binarySearch(source, markerObject, timeOrderComparator);
-            
+
             // if the anchor is past all values, it needs to be allowed
             if(Math.abs(index) < source.size() || allowFutureAnchor){
                 if(forward == true){
                     index = index < 0 ? Math.abs(index) - 2 : Math.abs(index) - 1;
                     for(int i = index; i >= 0 && count-- > 0; --i){
                         results.add(source.get(i));
-                    }                                        
+                    }
                 } else {
                     index = index < 0 ? Math.abs(index) - 1 : Math.abs(index) + 1;
                     for(int i = index; i < source.size() && count-- > 0; ++i){
@@ -58,11 +60,11 @@ public class ContentListHelper {
                 }
             }
         } else if(forward == true) {
-            // just read from the end of the user content list 
+            // just read from the end of the user content list
             for(int i = source.size() - 1; i >= 0 && count-- > 0; --i)
-                results.add(source.get(i));               
+                results.add(source.get(i));
         }
-    
+
         return results;
     }
     
@@ -74,7 +76,7 @@ public class ContentListHelper {
             // Use reverse list walker for each user content list
             return new ReverseListWalker<Content>(source);
         } else {
-            Content markerObject = new Content(anchor.toDBObject());
+            Content markerObject = new Content(new Document("_id", anchor.getId()));
             int index = Collections.binarySearch(source, markerObject, timeOrderComparator);
             if(limit > 0){
 

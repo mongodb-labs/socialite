@@ -1,6 +1,6 @@
 package com.mongodb.socialite.async;
 
-import com.mongodb.DBObject;
+import org.bson.Document;
 
 public class AsyncReplayTask extends RecoverableAsyncTask {
 
@@ -20,7 +20,7 @@ public class AsyncReplayTask extends RecoverableAsyncTask {
     }
 
     @Override
-    protected DBObject buildRecoveryData() {
+    protected Document buildRecoveryData() {
         return recoveryRecord.getRecoveryData();
     }
 

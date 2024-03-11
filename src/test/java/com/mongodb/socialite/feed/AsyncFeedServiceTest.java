@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import com.mongodb.ConnectionString;
+import com.mongodb.client.MongoClients;
+import org.bson.Document;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -22,8 +25,6 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Stopwatch;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.MongoClient;
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.ServiceManager;
 import com.mongodb.socialite.api.Content;
 import com.mongodb.socialite.api.User;
@@ -129,17 +130,17 @@ public class AsyncFeedServiceTest {
     }
 
 
-    public AsyncFeedServiceTest(String testName, Map<String, Object> svcConfig) 
-                throws UnknownHostException {
-        asyncDatabase = new MongoClient(new MongoClientURI(ASYNC_DATABASE_URI)).getDatabase(ASYNC_DATABASE_NAME);
+    public AsyncFeedServiceTest(String testName, Map<String, Object> svcConfig) throws UnknownHostException {
+        ConnectionString connString = new ConnectionString(ASYNC_DATABASE_URI);
+        asyncDatabase = MongoClients.create(connString).getDatabase(ASYNC_DATABASE_NAME);
         asyncDatabase.drop();
         String databaseName = DATABASE_NAME + "-" + testName;
-        MongoClientURI uri = new MongoClientURI(BASE_URI + databaseName);
+        String uri = BASE_URI + databaseName;
         DatabaseTools.dropDatabaseByURI(uri, databaseName);
         this.services = new ServiceManager(svcConfig, uri);
         this.feedService = services.getFeedService();
         contentService = (InMemoryContentService) services.getContentService();
-        userService = (InMemoryUserService) services.getUserGraphService();   
+        userService = (InMemoryUserService) services.getUserGraphService();
     }
     
     @Test
@@ -222,8 +223,8 @@ public class AsyncFeedServiceTest {
         // async database, async should process it
         AsyncPostTask task = new AsyncPostTask(null, dummyPoster, dummyContent);
         RecoveryRecord record = task.getRecoveryRecord();
-        asyncColl.insertOne(record.toDBObject());
-        
+        asyncColl.insertOne(record.toDocument()); // Assuming toDocument() converts RecoveryRecord to Document
+
         // Wait for it to be picked up and processed by async
         // The recovery poll time is set to 1000 in test
         Thread.sleep(3000);
@@ -237,8 +238,8 @@ public class AsyncFeedServiceTest {
     public void shouldRecoverHungTask() throws Exception {
         // Get the async recovery collection
         AsyncServiceConfiguration defaultConfig = new AsyncServiceConfiguration();
-        MongoCollection asyncColl = asyncDatabase.getCollection(defaultConfig.recovery_collection_name);
-        
+        MongoCollection<Document> asyncColl = asyncDatabase.getCollection(defaultConfig.recovery_collection_name);
+
         // Create a dummy user and post
         User dummyPoster = new User("DummyFailedPoster");
         User dummyFollower = new User("DummyFailedFollower");
@@ -248,23 +249,24 @@ public class AsyncFeedServiceTest {
         Content dummyContent = new Content(dummyPoster, "RemoteFailedMessage", null);
         contentService.publishContent(dummyPoster, dummyContent);
 
-        // Place a dummy task with "PROCESSING" status into the  
+        // Place a dummy task with "PROCESSING" status into the
         // async database, async should time it out and then reprocess
         AsyncPostTask task = new AsyncPostTask(null, dummyPoster, dummyContent);
         RecoveryRecord record = task.getRecoveryRecord();
         record.markAsProcessing("dummyProcessor");
-        
-        // fudge the processing timestamp
-        Date timeoutDate = new Date((new Date()).getTime() - TIMEOUT_FAILURE_PERIOD);        
-        record.toDBObject().put(RecoveryRecord.LAST_TIMESTAMP_KEY, timeoutDate);
-        asyncColl.insertOne(record.toDBObject());
-        
+
+        // Fudge the processing timestamp
+        long timeoutTimestamp = System.currentTimeMillis() - TIMEOUT_FAILURE_PERIOD;
+        Document recoveryDocument = record.toDocument();
+        recoveryDocument.put(RecoveryRecord.LAST_TIMESTAMP_KEY, new Date(timeoutTimestamp));
+        asyncColl.insertOne(recoveryDocument);
+
         // Wait for it to be picked up and processed by async
         logger.info("Waiting for task to timeout...");
         Thread.sleep(3000);
-        
+
         // Get the feed for the user
-        List<Content> dummyFeed = feedService.getFeedFor(dummyFollower, 10);    
+        List<Content> dummyFeed = feedService.getFeedFor(dummyFollower, 10);
         assertFalse(dummyFeed.isEmpty() || !dummyFeed.get(0).equals(dummyContent));
     }
 

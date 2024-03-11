@@ -1,7 +1,6 @@
 package com.mongodb.socialite.cli;
 
 import com.codahale.metrics.*;
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.ServiceManager;
 import com.mongodb.socialite.SocialiteConfiguration;
 import com.mongodb.socialite.services.ContentService;
@@ -33,7 +32,7 @@ public abstract class RampBenchmarkBase extends ConfiguredCommand<SocialiteConfi
             Namespace namespace, SocialiteConfiguration config) throws Exception {
 
         // Get the configured default MongoDB URI
-        MongoClientURI default_uri = config.mongodb.default_database_uri;
+        String default_uri = config.mongodb.default_database_uri;
         
         // Initialize the services as per configuration
         this.services = new ServiceManager(config.services, default_uri);

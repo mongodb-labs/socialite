@@ -1,6 +1,5 @@
 package com.mongodb.socialite.cli;
 
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.ServiceManager;
 import com.mongodb.socialite.SocialiteConfiguration;
 import com.mongodb.socialite.api.Content;
@@ -49,7 +48,7 @@ public class LoadCommand extends ConfiguredCommand<SocialiteConfiguration> {
     protected void run(Bootstrap<SocialiteConfiguration> configBootstrap, Namespace namespace, SocialiteConfiguration config) throws Exception {
 
         // Get the configured default MongoDB URI
-        MongoClientURI default_uri = config.mongodb.default_database_uri;
+        String default_uri = config.mongodb.default_database_uri;
         
         // Initialize the services as per configuration
         ServiceManager services = new ServiceManager(config.services, default_uri);

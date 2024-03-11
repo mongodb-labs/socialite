@@ -1,6 +1,5 @@
 package com.mongodb.socialite.feed;
 
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.api.Content;
 import com.mongodb.socialite.api.ContentId;
 import com.mongodb.socialite.api.User;
@@ -24,7 +23,7 @@ public class FanoutOnRead implements FeedService {
     private final UserGraphService usergraph;  
     private final FanoutOnReadConfiguration config;
 
-    public FanoutOnRead(final MongoClientURI dbUri, final UserGraphService usergraph, 
+    public FanoutOnRead(final String dbUri, final UserGraphService usergraph,
             final ContentService content, final FanoutOnReadConfiguration svcConfig) {
         this.content = content;
         this.usergraph = usergraph;

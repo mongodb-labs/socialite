@@ -21,7 +21,6 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
 import com.google.common.collect.Sets;
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.ServiceFactory;
 import com.mongodb.socialite.ServiceManager;
 import com.mongodb.socialite.api.Content;
@@ -49,7 +48,7 @@ public class FeedPaginationTest {
     private final static User user3 = new User("user3");
     private final static User user4 = new User("user4");
 
-    public static void initDependencies(ServiceFactory factory, MongoClientURI dbUri) 
+    public static void initDependencies(ServiceFactory factory, String dbUri)
         throws UnknownHostException{
         Map<String, Object> contentCfg = new LinkedHashMap<String, Object>();
         contentCfg.put(ServiceManager.MODEL_KEY, "InMemoryContentService");
@@ -104,7 +103,7 @@ public class FeedPaginationTest {
     public FeedPaginationTest(String testName, Map<String, Object> svcConfig) 
                 throws UnknownHostException {
         String databaseName = DATABASE_NAME + "-" + testName;
-        MongoClientURI uri = new MongoClientURI(BASE_URI + databaseName);
+        String uri = BASE_URI + databaseName;
         DatabaseTools.dropDatabaseByURI(uri, databaseName);
         // Load the configured FeedService implementation passing
         // the UserGraph and Content service as arguments

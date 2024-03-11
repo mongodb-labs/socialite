@@ -76,7 +76,7 @@ public class UserResourceTest extends ResourceTest {
     @Test
     public void shouldReturnAUsersFollowers() throws Exception {
         assertThat(client().resource("/users/user1/followers").get(List.class))
-                .containsOnly(user2.toDBObject(), user3.toDBObject());
+                .containsOnly(user2, user3);
     }
 
     @Test(expected = Exception.class)
