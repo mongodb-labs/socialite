@@ -8,7 +8,6 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.services.AsyncService;
 import com.mongodb.socialite.services.ContentService;
 import com.mongodb.socialite.services.FeedService;
@@ -37,9 +36,9 @@ public class ServiceManager implements Managed{
     
     private final Map<String, Object> svcConfig;
     private final ServiceFactory factory;
-    private final MongoClientURI defaultDbUri;
+    private final String defaultDbUri;
 
-    public ServiceManager(Map<String, Object> svcConfig, MongoClientURI defaultUri) {
+    public ServiceManager(Map<String, Object> svcConfig, String defaultUri) {
 
         this.svcConfig = svcConfig;
         this.factory = new ServiceFactory();

@@ -2,20 +2,19 @@ package com.mongodb.socialite.async;
 
 import org.bson.types.ObjectId;
 
-import com.mongodb.BasicDBObject;
-import com.mongodb.DBObject;
 import com.mongodb.socialite.api.Content;
 import com.mongodb.socialite.api.ContentId;
 import com.mongodb.socialite.api.User;
+import org.bson.Document;
 
 public class AsyncPostTask extends RecoverableAsyncTask {
-    
+
     private static final String CONTENT_ID_KEY = "c";
     private static final String SENDER_KEY = "u";
 
     private final User sender;
     private final Content content;
-    
+
     public AsyncPostTask(AsyncWorker worker, User sender, Content content) {
         super(worker, AsyncTaskType.FEED_POST_FANOUT);
         this.sender = sender;
@@ -24,8 +23,8 @@ public class AsyncPostTask extends RecoverableAsyncTask {
 
 
     @Override
-    protected DBObject buildRecoveryData() {
-        BasicDBObject data = new BasicDBObject();
+    protected Document buildRecoveryData() {
+        Document data = new Document();
         data.put(SENDER_KEY, this.sender.getUserId());
         data.put(CONTENT_ID_KEY, this.content.getId());
         return data;
@@ -49,11 +48,9 @@ public class AsyncPostTask extends RecoverableAsyncTask {
         String userId = (String) record.getRecoveryData().get(SENDER_KEY);
         return new User(userId);
     }
-    
+
     public static ContentId getContentIdFromRecord(RecoveryRecord record) {
         ObjectId contentId = (ObjectId) record.getRecoveryData().get(CONTENT_ID_KEY);
         return new ContentId(contentId);
     }
-    
-    
 }

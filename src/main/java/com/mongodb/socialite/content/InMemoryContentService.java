@@ -8,7 +8,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.bson.types.ObjectId;
 
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.api.Content;
 import com.mongodb.socialite.api.ContentId;
 import com.mongodb.socialite.api.User;
@@ -26,7 +25,7 @@ public class InMemoryContentService implements ContentService, TestService {
     private ConcurrentHashMap<User, List<Content>> userContentLists = new ConcurrentHashMap<User, List<Content>>();
     private BasicContentValidator postValidator = new BasicContentValidator();
                             
-    public InMemoryContentService(final MongoClientURI dbUri){}
+    public InMemoryContentService(final String dbUri){}
        
     @Override
     public Content getContentById(ContentId id) {

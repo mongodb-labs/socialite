@@ -1,6 +1,5 @@
 package com.mongodb.socialite.users;
 
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.api.*;
 import com.mongodb.socialite.services.ServiceImplementation;
 import com.mongodb.socialite.services.TestService;
@@ -17,7 +16,7 @@ public class InMemoryUserService implements UserGraphService, TestService {
     private Map<String, Set<User>> followerIndex = new HashMap<String, Set<User>>();
     private Map<String, Set<User>> followingIndex = new HashMap<String, Set<User>>();
 
-    public InMemoryUserService(final MongoClientURI dbUri){}
+    public InMemoryUserService(final String dbUri){}
 
     @Override
     public User getOrCreateUserById(String userId) {

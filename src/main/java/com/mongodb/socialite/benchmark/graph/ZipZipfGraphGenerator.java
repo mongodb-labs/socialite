@@ -4,7 +4,7 @@ package com.mongodb.socialite.benchmark.graph;
 import com.mongodb.socialite.api.User;
 import com.mongodb.socialite.benchmark.generator.ZipfGenerator;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+import org.apache.commons.lang3.NotImplementedException;
 
 import java.util.ArrayList;
 import java.util.HashMap;

@@ -13,7 +13,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.api.ServiceException;
 import com.mongodb.socialite.api.User;
 import com.mongodb.socialite.configuration.DefaultUserServiceConfiguration;
@@ -30,7 +29,7 @@ public class DefaultUserServiceTest {
 	private static final String BASE_URI = "mongodb://localhost/";
 	
 	private DefaultUserService userService;
-    private MongoClientURI uri;
+    private String uri;
 
 
 	@Parameters
@@ -86,7 +85,7 @@ public class DefaultUserServiceTest {
     		throws UnknownHostException {
 		
         String databaseName = DATABASE_NAME + "-" + testName;
-        uri = new MongoClientURI(BASE_URI + databaseName);
+        uri = BASE_URI + databaseName;
         DatabaseTools.dropDatabaseByURI(uri, databaseName);
         userService = new DefaultUserService(uri, config);
 	}

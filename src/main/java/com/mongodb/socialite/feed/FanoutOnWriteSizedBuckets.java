@@ -2,13 +2,13 @@ package com.mongodb.socialite.feed;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import com.mongodb.BasicDBList;
-import com.mongodb.BasicDBObject;
-import com.mongodb.DBCollection;
-import com.mongodb.DBCursor;
-import com.mongodb.DBObject;
-import com.mongodb.MongoClientURI;
+import com.mongodb.client.FindIterable;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReturnDocument;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.socialite.api.Content;
 import com.mongodb.socialite.api.ContentId;
 import com.mongodb.socialite.api.FrameworkError;
@@ -19,6 +19,7 @@ import com.mongodb.socialite.services.ContentService;
 import com.mongodb.socialite.services.ServiceImplementation;
 import com.mongodb.socialite.services.UserGraphService;
 import com.yammer.dropwizard.config.Configuration;
+import org.bson.Document;
 
 import static com.mongodb.socialite.util.MongoDBQueryHelpers.*;
 
@@ -32,19 +33,18 @@ public class FanoutOnWriteSizedBuckets extends CachedFeedService{
     public static final String BUCKET_OWNER_KEY = "_u";
     public static final String BUCKET_SIZE_KEY = "_s";
     public static final String BUCKET_CONTENT_KEY = "_c";
-    
-    private final DBCollection buckets;        
     private final FanoutOnWriteSizedBucketsConfiguration config;
+    private final MongoCollection<Document> buckets;
 
-    public FanoutOnWriteSizedBuckets(final MongoClientURI dbUri, final UserGraphService userGraph, 
-            final ContentService content, final FanoutOnWriteSizedBucketsConfiguration svcConfig) {
-        
+    public FanoutOnWriteSizedBuckets(final String dbUri, final UserGraphService userGraph,
+                                     final ContentService content, final FanoutOnWriteSizedBucketsConfiguration svcConfig) {
+
         super(dbUri, userGraph, content, svcConfig);
         this.config = svcConfig;
-        
+
         // setup the buckets collection for users
         this.buckets = this.database.getCollection(config.bucket_collection_name);
-        this.buckets.createIndex( new BasicDBObject(
+        this.buckets.createIndex( new Document(
                 BUCKET_OWNER_KEY, 1).append(BUCKET_ID_KEY, 1));
     }
     
@@ -94,27 +94,30 @@ public class FanoutOnWriteSizedBuckets extends CachedFeedService{
     @Override
     public List<Content> getFeedFor(final User user, final int limit) {
 
-        List<Content> result = new ArrayList<Content>(limit);
-        DBCursor cursor = buckets.find(
-                findBy(BUCKET_OWNER_KEY, user.getUserId()), getFields(BUCKET_CONTENT_KEY)).
-                sort(sortByDecending(BUCKET_ID_KEY)).batchSize(config.bucket_read_batch_size);
-        
-        try{
+        List<Content> result = new ArrayList<>(limit);
+        FindIterable<Document> iterable = buckets.find(
+                        Filters.eq(BUCKET_OWNER_KEY, user.getUserId()))
+                .sort(Sorts.descending(BUCKET_ID_KEY))
+                .batchSize(config.bucket_read_batch_size);
+
+        MongoCursor<Document> cursor = iterable.iterator();
+
+        try {
             while(cursor.hasNext() && result.size() < limit){
-                DBObject currentBucket = cursor.next();
+                Document currentBucket = cursor.next();
                 @SuppressWarnings("unchecked")
-                List<DBObject> contentList = (List<DBObject>)currentBucket.get(BUCKET_CONTENT_KEY);
+                List<Document> contentList = (List<Document>)currentBucket.get(BUCKET_CONTENT_KEY);
                 int bucketSize = contentList.size();
                 for(int i = bucketSize - 1; i >= 0; --i){
                     result.add(new Content(contentList.get(i)));
                     if(result.size() >= limit)
                         break;
-                } 
+                }
             }
         } finally {
             cursor.close();
         }
-        
+
         return result;
     }
 
@@ -124,28 +127,23 @@ public class FanoutOnWriteSizedBuckets extends CachedFeedService{
     }
 
     private void pushContentToFixedBucket(final User recipient, final Content content){
-        DBObject result = buckets.findAndModify(
-                findBy(BUCKET_OWNER_KEY, recipient.getUserId()), 
-                getFields(BUCKET_SIZE_KEY), 
-                sortByDecending(BUCKET_ID_KEY), 
-                /* remove */ false, 
-                new BasicDBObject("$push", new BasicDBObject(BUCKET_CONTENT_KEY, content.toDBObject()))
-                .append("$inc", new BasicDBObject(BUCKET_SIZE_KEY, 1)),
-                /* return new */ true, 
-                /* upsert */ true);
-        
+        Document result = buckets.findOneAndUpdate(
+                findBy(BUCKET_OWNER_KEY, recipient.getUserId()),
+                new Document("$push", new Document(BUCKET_CONTENT_KEY, content.toDocument()))
+                        .append("$inc", new Document(BUCKET_SIZE_KEY, 1)),
+                new FindOneAndUpdateOptions().sort(Sorts.descending(BUCKET_ID_KEY)).upsert(true).returnDocument(ReturnDocument.AFTER));
+
         if(result == null || ((Integer)result.get(BUCKET_SIZE_KEY)).intValue() >= config.bucket_size){
             createNewBucket(recipient, config.bucket_size);
         }
     }
 
-    
     private void createNewBucket(final User recipient, final int size) {
-        
-        // a good place to preallocate bucket document when embedding 
-        // content in the cache, since bucket will be just an array of objectID      
-        BasicDBObject newBucket = new BasicDBObject(BUCKET_OWNER_KEY, recipient.getUserId()).
-                append(BUCKET_SIZE_KEY, 0).append(BUCKET_CONTENT_KEY, new BasicDBList());
-        buckets.insert(newBucket);
+
+        // a good place to preallocate bucket document when embedding
+        // content in the cache, since bucket will be just an array of objectID
+        Document newBucket = new Document(BUCKET_OWNER_KEY, recipient.getUserId())
+                .append(BUCKET_SIZE_KEY, 0).append(BUCKET_CONTENT_KEY, new ArrayList<>());
+        buckets.insertOne(newBucket);
     }
 }

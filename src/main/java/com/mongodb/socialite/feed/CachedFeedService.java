@@ -1,6 +1,5 @@
 package com.mongodb.socialite.feed;
 
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.MongoBackedService;
 import com.mongodb.socialite.configuration.CachedFeedServiceConfiguration;
 import com.mongodb.socialite.services.ContentService;
@@ -14,7 +13,7 @@ public abstract class CachedFeedService
     protected final UserGraphService usergraphService;
     protected final CacheContentFilter cacheFilter;
 
-    public CachedFeedService(final MongoClientURI dbUri, final UserGraphService usergraph, 
+    public CachedFeedService(final String dbUri, final UserGraphService usergraph,
             final ContentService content, final CachedFeedServiceConfiguration svcConfig){
         super(dbUri, svcConfig);
         this.contentService = content;

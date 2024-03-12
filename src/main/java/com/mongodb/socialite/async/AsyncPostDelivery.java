@@ -6,7 +6,6 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.api.Content;
 import com.mongodb.socialite.api.ContentId;
 import com.mongodb.socialite.api.FollowerCount;
@@ -34,7 +33,7 @@ import com.yammer.dropwizard.config.Configuration;
     private final ContentService contentService;
     private final AsyncPostDeliveryConfiguration config;
     
-    public AsyncPostDelivery(final MongoClientURI dbUri, final FeedService toWrap,
+    public AsyncPostDelivery(final String dbUri, final FeedService toWrap,
             final UserGraphService userGraph, final ContentService content,
             final AsyncService asyncService, final AsyncPostDeliveryConfiguration config){
         this.config = config;

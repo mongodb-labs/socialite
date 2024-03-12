@@ -2,7 +2,6 @@ package com.mongodb.socialite.content;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.ServiceFactory;
 import com.mongodb.socialite.ServiceManager;
 import com.mongodb.socialite.api.Content;
@@ -66,7 +65,7 @@ public class ContentServiceTest {
             throws UnknownHostException {
         
         String databaseName = DATABASE_NAME + "-" + testName;
-        MongoClientURI uri = new MongoClientURI(BASE_URI + databaseName);
+        String uri = BASE_URI + databaseName;
         DatabaseTools.dropDatabaseByURI(uri, databaseName);
         
         // Load the configured ContentService implementation 

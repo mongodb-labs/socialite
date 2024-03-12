@@ -2,7 +2,6 @@ package com.mongodb.socialite;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.cli.*;
 import com.mongodb.socialite.resources.UserResource;
 import com.yammer.dropwizard.Service;
@@ -34,7 +33,7 @@ public class SocialiteService extends Service<SocialiteConfiguration> {
     public void run(SocialiteConfiguration config, Environment environment) throws Exception {
       	        
        	// Get the configured default MongoDB URI
-        MongoClientURI default_uri = config.mongodb.default_database_uri;
+        String default_uri = config.mongodb.default_database_uri;
         
         // Initialize the services as per configuration
         ServiceManager services = new ServiceManager(config.services, default_uri);

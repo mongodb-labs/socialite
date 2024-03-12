@@ -17,7 +17,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
-import com.mongodb.MongoClientURI;
 import com.mongodb.socialite.ServiceFactory;
 import com.mongodb.socialite.ServiceManager;
 import com.mongodb.socialite.api.Content;
@@ -46,7 +45,7 @@ public class FilteredCachedFeedTest {
 
     private final static Content message1 = new Content(user1, "message from user 1", null);
     
-    public static void initDependencies(ServiceFactory factory, MongoClientURI dbUri) 
+    public static void initDependencies(ServiceFactory factory, String dbUri)
             throws UnknownHostException{
         Map<String, Object> contentCfg = new LinkedHashMap<String, Object>();
         contentCfg.put(ServiceManager.MODEL_KEY, "InMemoryContentService");
@@ -116,7 +115,7 @@ public class FilteredCachedFeedTest {
                 throws UnknownHostException {
         this.testName = testName;
         String databaseName = DATABASE_NAME + "-" + testName;
-        MongoClientURI uri = new MongoClientURI(BASE_URI + databaseName);
+        String uri = BASE_URI + databaseName;
         DatabaseTools.dropDatabaseByURI(uri, databaseName);
         // Load the configured FeedService implementation passing
         // the UserGraph and Content service as arguments
