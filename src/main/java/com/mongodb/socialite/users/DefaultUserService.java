@@ -21,7 +21,7 @@ import java.util.Date;
 
 @ServiceImplementation(name = "DefaultUserService", configClass = DefaultUserServiceConfiguration.class)
 public class DefaultUserService
-    extends MongoBackedService implements UserGraphService {
+        extends MongoBackedService implements UserGraphService {
 
     private static final String USER_ID_KEY = "_id";
     private static final String EDGE_OWNER_KEY = "_f";
@@ -30,7 +30,7 @@ public class DefaultUserService
     private static final String FOLLOWING_COUNT_KEY = "_cg";
 
     private static final BasicDBObject SELECT_USER_ID =
-    		new BasicDBObject(USER_ID_KEY, 1);
+            new BasicDBObject(USER_ID_KEY, 1);
     private MongoCollection followersMC = null;
     private MongoCollection followingMC = null;
 
@@ -246,7 +246,7 @@ public class DefaultUserService
     public void follow(User user, User toFollow) {
 
         // Use the same edge _id for both edge collections
-        ObjectId edgeId = new ObjectId();
+        String edgeId = new ObjectId().toString();
         ClientSession clientSession = null;
         int txn_retries = 0;
 
@@ -522,7 +522,7 @@ public class DefaultUserService
         return friend_ids;
     }
 
-    private void insertEdgeWithId(MongoCollection<Document> edgeCollection, ObjectId id, User user, User toFollow) {
+    private void insertEdgeWithId(MongoCollection<Document> edgeCollection, String id, User user, User toFollow) {
         try {
             edgeCollection.insertOne(makeEdgeWithId(id, user, toFollow));
         } catch (MongoWriteException e) {
@@ -532,7 +532,7 @@ public class DefaultUserService
         }
     }
 
-    private void insertEdgeWithId(MongoCollection edgeCollection, ObjectId id, User user, User toFollow, ClientSession session) {
+    private void insertEdgeWithId(MongoCollection edgeCollection, String id, User user, User toFollow, ClientSession session) {
         // try {
         edgeCollection.insertOne( session, makeEdgeWithId(id, user, toFollow));
         // } catch( MongoCommandException e ) {
@@ -577,7 +577,7 @@ public class DefaultUserService
         return new Document(EDGE_OWNER_KEY, from.getUserId()).append(EDGE_PEER_KEY, to.getUserId());
     }
 
-    static Document makeEdgeWithId(ObjectId id, User from, User to) {
+    static Document makeEdgeWithId(String id, User from, User to) {
         return new Document(USER_ID_KEY, id).append(EDGE_OWNER_KEY, from.getUserId()).append(EDGE_PEER_KEY, to.getUserId());
     }
 

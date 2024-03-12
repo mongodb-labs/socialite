@@ -24,7 +24,7 @@ public class Content extends MongoDataObject {
     public Content(final User author,
                    final String message, final JSONParam data) {
         super();
-        _document.put(ID_KEY, new ObjectId());
+        _document.put(ID_KEY, new ObjectId().toString());
         _document.put(AUTHOR_KEY, author.getUserId());
         if(data != null)
             _document.put(DATA_KEY, Document.parse(data.toString()));
@@ -50,9 +50,9 @@ public class Content extends MongoDataObject {
 
     @JsonProperty("date")
     public Date getDate() {
-        return ((ObjectId)_document.get(ID_KEY)).getDate();
+        long timestamp = Long.parseLong(_document.get(ID_KEY).toString(), 16);
+        return new Date(timestamp);
     }
-
     @JsonProperty("author")
     public String getAuthorId() {
         return (String) _document.get(AUTHOR_KEY);

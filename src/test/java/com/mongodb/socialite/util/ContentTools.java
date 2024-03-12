@@ -12,14 +12,14 @@ public class ContentTools {
 
     public static void implantSequentialId(Content post){
         String fakeId = Integer.toHexString(idSequence.getAndIncrement());
-        post.toDocument().put(Content.ID_KEY, new ObjectId(fakeId));
+        post.toDocument().put(Content.ID_KEY, fakeId); // Insert '_id' as a String
     }
 
     public static Content createSequentialPost(User author){
         int postId = idSequence.getAndIncrement();
         Content newPost = new Content(author, "message-" + postId, null);
         String fakeId = Integer.toHexString(postId);
-        newPost.toDocument().put(Content.ID_KEY, new ObjectId(fakeId));
+        newPost.toDocument().put(Content.ID_KEY, fakeId); // Insert '_id' as a String
 
         return newPost;
     }

@@ -29,9 +29,9 @@ import org.slf4j.LoggerFactory;
 
 public class LoadCommand extends ConfiguredCommand<SocialiteConfiguration> {
 
-	private static Logger logger = LoggerFactory.getLogger(LoadCommand.class);
+    private static Logger logger = LoggerFactory.getLogger(LoadCommand.class);
 
-	public LoadCommand() {
+    public LoadCommand() {
         super("load", "Loads synthetic data for testing");
     }
 
@@ -49,7 +49,7 @@ public class LoadCommand extends ConfiguredCommand<SocialiteConfiguration> {
 
         // Get the configured default MongoDB URI
         String default_uri = config.mongodb.default_database_uri;
-        
+
         // Initialize the services as per configuration
         ServiceManager services = new ServiceManager(config.services, default_uri);
         final UserGraphService userGraph = services.getUserGraphService();
@@ -73,21 +73,21 @@ public class LoadCommand extends ConfiguredCommand<SocialiteConfiguration> {
             executor.submit( new Runnable() {
                 @Override
                 public void run() {
-                	try{
-	                    userGraph.createUser(mutation.user);
-	                    List<User> followers = mutation.getFollowers();
-	                    for( User u : followers ) {
-	                       userGraph.follow(mutation.user, u);
-	                    }
-	                    
-	                    if(logger.isDebugEnabled()){
-	                    	logger.debug("Added {} followers for user {}", 
-	                    			followers.size(), mutation.user.getUserId());
-	                    }
-                	} catch(Exception e){
-                		logger.error(e.toString());
-                		logger.debug("", e);                		
-                	}
+                    try{
+                        userGraph.createUser(mutation.user);
+                        List<User> followers = mutation.getFollowers();
+                        for( User u : followers ) {
+                            userGraph.follow(mutation.user, u);
+                        }
+
+                        if(logger.isDebugEnabled()){
+                            logger.debug("Added {} followers for user {}",
+                                    followers.size(), mutation.user.getUserId());
+                        }
+                    } catch(Exception e){
+                        logger.error(e.toString());
+                        logger.debug("", e);
+                    }
                 }
             });
         }
@@ -99,17 +99,17 @@ public class LoadCommand extends ConfiguredCommand<SocialiteConfiguration> {
             executor.submit( new Runnable() {
                 @Override
                 public void run() {
-                	try{
-	                    for( int i = 0; i < userCount; i++ ) {
-	                        final User user = new User( String.valueOf(i));
-	                        final Content content = new Content( user, randomString(), null);
-	                        contentService.publishContent(user, content);
-	                        feedService.post( user, content );
-	                    }
-                	} catch(Exception e){
-                		logger.error(e.toString());
-                		logger.debug("", e);                		
-                	}
+                    try{
+                        for( int i = 0; i < userCount; i++ ) {
+                            final User user = new User( String.valueOf(i));
+                            final Content content = new Content( user, randomString(), null);
+                            contentService.publishContent(user, content);
+                            feedService.post( user, content );
+                        }
+                    } catch(Exception e){
+                        logger.error(e.toString());
+                        logger.debug("", e);
+                    }
                 }
             });
         }
